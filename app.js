@@ -91,15 +91,21 @@ const tileDefinitions = [
   },
   {
     id: "tile-13",
-    label: "Music",
-    question: "What do you call a pattern of beats in music?",
-    answers: ["rhythm", "beat"],
+    label: "Latin",
+    question: "Latin?",
+    imageSrc: "images/latin.png",
+    imageAlt: "A themed image for the Latin prompt.",
+    inputMode: "verify-only",
+    correctPoints: 1,
   },
   {
     id: "tile-14",
-    label: "Sport",
-    question: "Which sport is often played with goals, a ball, and feet?",
-    answers: ["football", "soccer"],
+    label: "Mandarin",
+    question: "Mandarin?",
+    imageSrc: "images/mandarin.png",
+    imageAlt: "A themed image for the Mandarin prompt.",
+    inputMode: "verify-only",
+    correctPoints: 1,
   },
   {
     id: "tile-15",
@@ -281,7 +287,7 @@ function handleOptionGridClick(event) {
   }
 
   const tile = getActiveTile();
-  if (!tile || tile.inputMode !== "multi-select") {
+  if (!tile || getTileInputMode(tile) !== "multi-select") {
     return;
   }
 
@@ -328,7 +334,7 @@ function openModal(tile) {
   elements.modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
 
-  if (tile.inputMode !== "multi-select") {
+  if (getTileInputMode(tile) === "text") {
     window.requestAnimationFrame(() => {
       elements.answerInput.focus();
     });
@@ -361,7 +367,17 @@ async function handleAnswerSubmit(event) {
     return;
   }
 
-  const attempt = evaluateAttempt(tile);
+  if (getTileInputMode(tile) === "multi-select") {
+    await handleMultiSelectSubmit(tile);
+    return;
+  }
+
+  if (getTileInputMode(tile) === "verify-only") {
+    await handleVerifyOnlySubmit(tile);
+    return;
+  }
+
+  const attempt = evaluateTextAttempt(tile, elements.answerInput.value);
   if (!attempt) {
     return;
   }
@@ -382,12 +398,50 @@ async function handleAnswerSubmit(event) {
   }
 }
 
-function evaluateAttempt(tile) {
-  if (tile.inputMode === "multi-select") {
-    return evaluateMultiSelectAttempt(tile);
+async function handleMultiSelectSubmit(tile) {
+  const requiredSelections = tile.selectionLimit || 3;
+  if (state.selectedOptions.length !== requiredSelections) {
+    setFeedback(`Select ${requiredSelections} songs first.`, "is-error");
+    return;
   }
 
-  return evaluateTextAttempt(tile, elements.answerInput.value);
+  setSubmitBusy(true);
+  setFeedback("", "");
+
+  try {
+    await performBiometricVerification();
+
+    const attempt = evaluateMultiSelectAttempt(tile);
+    if (!attempt) {
+      return;
+    }
+
+    const totalPoints = solveTile(tile, attempt.basePoints);
+    closeModal(true);
+    showPointsBurst(totalPoints);
+  } catch (error) {
+    setFeedback(getVerificationErrorMessage(error), "is-error");
+  } finally {
+    setSubmitBusy(false);
+    updateAnswerControls(tile);
+  }
+}
+
+async function handleVerifyOnlySubmit(tile) {
+  setSubmitBusy(true);
+  setFeedback("", "");
+
+  try {
+    await performBiometricVerification();
+    const totalPoints = solveTile(tile, tile.correctPoints || 1);
+    closeModal(true);
+    showPointsBurst(totalPoints);
+  } catch (error) {
+    setFeedback(getVerificationErrorMessage(error), "is-error");
+  } finally {
+    setSubmitBusy(false);
+    updateAnswerControls(tile);
+  }
 }
 
 function evaluateTextAttempt(tile, rawAnswer) {
@@ -419,12 +473,6 @@ function evaluateTextAttempt(tile, rawAnswer) {
 }
 
 function evaluateMultiSelectAttempt(tile) {
-  const requiredSelections = tile.selectionLimit || 3;
-  if (state.selectedOptions.length !== requiredSelections) {
-    setFeedback(`Select ${requiredSelections} songs first.`, "is-error");
-    return null;
-  }
-
   const selected = state.selectedOptions.map(normalizeText).sort();
   const correct = tile.correctOptions.map(normalizeText).sort();
   const isCorrect =
@@ -442,7 +490,7 @@ function evaluateMultiSelectAttempt(tile) {
 }
 
 function renderOptionGrid(tile) {
-  const isMultiSelect = tile.inputMode === "multi-select";
+  const isMultiSelect = getTileInputMode(tile) === "multi-select";
   elements.optionGrid.hidden = !isMultiSelect;
 
   if (!isMultiSelect) {
@@ -470,11 +518,15 @@ function renderOptionGrid(tile) {
 }
 
 function updateAnswerControls(tile) {
-  const isMultiSelect = tile.inputMode === "multi-select";
-  elements.answerInput.hidden = isMultiSelect;
-  elements.answerInput.disabled = false;
+  const inputMode = getTileInputMode(tile);
+  const isMultiSelect = inputMode === "multi-select";
+  const isVerifyOnly = inputMode === "verify-only";
+
+  elements.answerForm.classList.toggle("is-verify-only", isVerifyOnly);
+  elements.answerInput.hidden = isMultiSelect || isVerifyOnly;
+  elements.answerInput.disabled = isVerifyOnly;
   elements.selectionSummary.hidden = !isMultiSelect;
-  elements.answerInput.style.display = isMultiSelect ? "none" : "";
+  elements.answerInput.style.display = isMultiSelect || isVerifyOnly ? "none" : "";
   elements.selectionSummary.style.display = isMultiSelect ? "grid" : "none";
 
   if (isMultiSelect) {
@@ -500,18 +552,19 @@ function setSubmitBusy(isBusy) {
   state.isSubmitting = isBusy;
 
   const tile = getActiveTile();
+  const inputMode = tile ? getTileInputMode(tile) : "text";
 
   elements.closeModalButton.disabled = isBusy;
   elements.submitButton.textContent = isBusy ? "..." : "OK";
 
-  if (tile?.inputMode === "multi-select") {
+  if (inputMode === "multi-select") {
     elements.submitButton.disabled = isBusy || state.selectedOptions.length !== (tile.selectionLimit || 3);
     const optionButtons = elements.optionGrid.querySelectorAll(".option-chip");
     optionButtons.forEach((button) => {
       button.disabled = isBusy;
     });
   } else {
-    elements.answerInput.disabled = isBusy;
+    elements.answerInput.disabled = isBusy || inputMode === "verify-only";
     elements.submitButton.disabled = isBusy;
   }
 }
@@ -621,6 +674,10 @@ function buildLineDefinitions(size) {
 
 function getActiveTile() {
   return state.tiles.find((tile) => tile.id === state.activeTileId) || null;
+}
+
+function getTileInputMode(tile) {
+  return tile.inputMode || "text";
 }
 
 async function performBiometricVerification() {
