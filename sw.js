@@ -1,4 +1,4 @@
-const CACHE_NAME = "lux-bingo-v2";
+const CACHE_NAME = "lux-bingo-v3";
 const BASE_URL = new URL("./", self.location.href);
 const INDEX_URL = new URL("./index.html", self.location.href).href;
 const APP_SHELL = [
@@ -40,28 +40,58 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(INDEX_URL))
-    );
+  const requestUrl = new URL(event.request.url);
+  const isSameOrigin = requestUrl.origin === self.location.origin;
+
+  if (!isSameOrigin) {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+  if (event.request.mode === "navigate" || shouldUseNetworkFirst(requestUrl)) {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
 
-      return fetch(event.request).then((networkResponse) => {
-        const responseToCache = networkResponse.clone();
-
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return networkResponse;
-      });
-    })
-  );
+  event.respondWith(cacheFirst(event.request));
 });
+
+function shouldUseNetworkFirst(url) {
+  return [".html", ".css", ".js", ".webmanifest"].some((suffix) =>
+    url.pathname.endsWith(suffix)
+  );
+}
+
+async function networkFirst(request) {
+  try {
+    const networkResponse = await fetch(request);
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(request, networkResponse.clone());
+    return networkResponse;
+  } catch (error) {
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    if (request.mode === "navigate") {
+      const cachedIndex = await caches.match(INDEX_URL);
+      if (cachedIndex) {
+        return cachedIndex;
+      }
+    }
+
+    throw error;
+  }
+}
+
+async function cacheFirst(request) {
+  const cachedResponse = await caches.match(request);
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+
+  const networkResponse = await fetch(request);
+  const cache = await caches.open(CACHE_NAME);
+  cache.put(request, networkResponse.clone());
+  return networkResponse;
+}
