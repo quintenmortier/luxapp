@@ -92,19 +92,23 @@ const tileDefinitions = [
   {
     id: "tile-13",
     label: "Latin",
-    question: "Latin?",
+    question: "Latin",
     imageSrc: "images/latin.png",
     imageAlt: "A themed image for the Latin prompt.",
     inputMode: "verify-only",
+    tileImageFit: "contain",
+    tileImagePosition: "center center",
     correctPoints: 1,
   },
   {
     id: "tile-14",
     label: "Mandarin",
-    question: "Mandarin?",
+    question: "Mandarin",
     imageSrc: "images/mandarin.png",
     imageAlt: "A themed image for the Mandarin prompt.",
     inputMode: "verify-only",
+    tileImageFit: "contain",
+    tileImagePosition: "center center",
     correctPoints: 1,
   },
   {
@@ -232,8 +236,11 @@ function renderBoard() {
       const ariaLabel = tile.solved
         ? `${tile.label} solved`
         : `Open the question for ${tile.label}`;
+      const tileImageStyle = buildTileImageStyle(tile);
       const tileContent = tile.imageSrc
-        ? `<img class="tile-image" src="${tile.imageSrc}" alt="${tile.imageAlt}" loading="lazy" decoding="async" />`
+        ? `<img class="tile-image" src="${tile.imageSrc}" alt="${tile.imageAlt}" loading="lazy" decoding="async" ${
+            tileImageStyle ? `style="${escapeHtml(tileImageStyle)}"` : ""
+          } />`
         : `<span class="tile-label">${tile.label}</span>`;
 
       return `
@@ -678,6 +685,20 @@ function getActiveTile() {
 
 function getTileInputMode(tile) {
   return tile.inputMode || "text";
+}
+
+function buildTileImageStyle(tile) {
+  const styles = [];
+
+  if (tile.tileImageFit) {
+    styles.push(`object-fit: ${tile.tileImageFit}`);
+  }
+
+  if (tile.tileImagePosition) {
+    styles.push(`object-position: ${tile.tileImagePosition}`);
+  }
+
+  return styles.join("; ");
 }
 
 async function performBiometricVerification() {
