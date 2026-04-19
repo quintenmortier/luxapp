@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lux Bingo</title>
+    <meta name="theme-color" content="#183934" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Lux Bingo" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="score-pill" id="score-pill" aria-live="polite">
+          <span class="score-pill-label">Score</span>
+          <strong id="score-value">0</strong>
+        </div>
+      </header>
+
+      <section class="board-panel">
+        <div id="bingo-board" class="bingo-board" aria-label="Bingo board"></div>
+      </section>
+
+      <div class="actions">
+        <button id="reset-button" class="reset-button" type="button">Reset board</button>
+      </div>
+    </main>
+
+    <div id="question-modal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section
+        class="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-prompt"
+      >
+        <button class="close-button" id="close-modal-button" type="button" aria-label="Close">
+          x
+        </button>
+        <div id="modal-visual" class="modal-visual">
+          <img id="modal-image" class="modal-image" alt="" hidden />
+          <div class="modal-overlay">
+            <h1 id="modal-prompt" class="modal-prompt">Question</h1>
+
+            <form id="answer-form" class="answer-form">
+              <label class="sr-only" for="answer-input">Answer</label>
+              <div class="answer-bar">
+                <input
+                  id="answer-input"
+                  class="answer-input"
+                  name="answer"
+                  type="text"
+                  autocomplete="off"
+                  autocapitalize="none"
+                  autocorrect="off"
+                  spellcheck="false"
+                  enterkeyhint="done"
+                  placeholder="Answer"
+                />
+                <button class="submit-button" type="submit" aria-label="Check answer">
+                  OK
+                </button>
+              </div>
+              <p id="answer-feedback" class="answer-feedback" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
