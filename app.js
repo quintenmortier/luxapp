@@ -1,6 +1,7 @@
 const boardRows = 5;
 const boardColumns = 3;
 const expectedTileCount = boardRows * boardColumns;
+const centerTileIndex = Math.floor(boardRows / 2) * boardColumns + Math.floor(boardColumns / 2);
 const BIOMETRIC_CREDENTIAL_KEY = "lux-bingo.biometric-credential-id";
 const BIOMETRIC_USER_ID_KEY = "lux-bingo.biometric-user-id";
 
@@ -83,21 +84,27 @@ const tileDefinitions = [
   },
   {
     id: "tile-8",
-    label: "Shape",
-    question: "Which shape has three sides?",
-    answers: ["triangle", "a triangle"],
+    label: "Japanese",
+    question: "Japanese",
+    imageSrc: "images/japanese.png",
+    imageAlt: "A themed image for the Japanese prompt.",
+    category: "language",
+    inputMode: "verify-only",
+    tileImageFit: "cover",
+    tileImagePosition: "center center",
+    correctPoints: 1,
   },
   {
     id: "tile-9",
-    label: "Office",
-    question: "Which device do you usually type on: keyboard or speaker?",
-    answers: ["keyboard", "a keyboard"],
-  },
-  {
-    id: "tile-10",
-    label: "Tree",
-    question: "What part of a tree usually stays underground?",
-    answers: ["roots", "root", "the roots"],
+    label: "Ukrainian",
+    question: "Ukrainian",
+    imageSrc: "images/ukrainian.png",
+    imageAlt: "A themed image for the Ukrainian prompt.",
+    category: "language",
+    inputMode: "verify-only",
+    tileImageFit: "cover",
+    tileImagePosition: "center center",
+    correctPoints: 1,
   },
   {
     id: "tile-11",
@@ -105,6 +112,7 @@ const tileDefinitions = [
     question: "Italian",
     imageSrc: "images/italian.png",
     imageAlt: "A themed image for the Italian prompt.",
+    category: "language",
     inputMode: "verify-only",
     tileImageFit: "cover",
     tileImagePosition: "center center",
@@ -116,6 +124,7 @@ const tileDefinitions = [
     question: "Arabic",
     imageSrc: "images/arabic.png",
     imageAlt: "A themed image for the Arabic prompt.",
+    category: "language",
     inputMode: "verify-only",
     tileImageFit: "cover",
     tileImagePosition: "center center",
@@ -127,6 +136,7 @@ const tileDefinitions = [
     question: "Latin",
     imageSrc: "images/latin.png",
     imageAlt: "A themed image for the Latin prompt.",
+    category: "language",
     inputMode: "verify-only",
     tileImageFit: "cover",
     tileImagePosition: "center center",
@@ -138,6 +148,7 @@ const tileDefinitions = [
     question: "Mandarin",
     imageSrc: "images/mandarin.png",
     imageAlt: "A themed image for the Mandarin prompt.",
+    category: "language",
     inputMode: "verify-only",
     tileImageFit: "cover",
     tileImagePosition: "center center",
@@ -149,6 +160,7 @@ const tileDefinitions = [
     question: "Select three songs from LUX that have already been played.",
     imageSrc: "images/lux.jpg",
     imageAlt: "The album cover for LUX.",
+    openingPlacement: "center",
     inputMode: "multi-select",
     manualVerification: true,
     selectionLimit: 3,
@@ -192,7 +204,7 @@ const tileDefinitions = [
 const lineDefinitions = buildLineDefinitions(boardRows, boardColumns);
 
 const state = {
-  tiles: createTiles(),
+  tiles: createTiles({ useOpeningLayout: true }),
   score: 0,
   completedLines: new Set(),
   activeTileId: null,
@@ -225,8 +237,12 @@ const elements = {
 render();
 bindEvents();
 
-function createTiles() {
-  const shuffledDefinitions = shuffleArray(tileDefinitions).slice(0, expectedTileCount);
+function createTiles(options = {}) {
+  const boardDefinitions = tileDefinitions.slice(0, expectedTileCount);
+  const arrangedDefinitions = options.useOpeningLayout
+    ? buildOpeningLayout(boardDefinitions)
+    : shuffleArray(boardDefinitions);
+  const shuffledDefinitions = arrangedDefinitions.slice(0, expectedTileCount);
   const tiles = shuffledDefinitions.map((tile, index) => ({
     ...tile,
     index,
@@ -792,6 +808,109 @@ function getTileInputMode(tile) {
 
 function usesManualVerification(tile) {
   return tile.manualVerification === true;
+}
+
+function buildOpeningLayout(definitions) {
+  const luxTile = definitions.find((tile) => tile.openingPlacement === "center");
+  const languageTiles = shuffleArray(definitions.filter((tile) => tile.category === "language"));
+
+  if (!luxTile) {
+    return shuffleArray(definitions);
+  }
+
+  const languagePositions = getOptimalLanguagePositions(languageTiles.length, [centerTileIndex]);
+  if (languagePositions.length !== languageTiles.length) {
+    return shuffleArray(definitions);
+  }
+
+  const arrangedDefinitions = Array(expectedTileCount).fill(null);
+  arrangedDefinitions[centerTileIndex] = luxTile;
+
+  languagePositions.forEach((position, index) => {
+    arrangedDefinitions[position] = languageTiles[index];
+  });
+
+  const remainingTiles = shuffleArray(
+    definitions.filter((tile) => tile !== luxTile && tile.category !== "language")
+  );
+  let remainingIndex = 0;
+
+  for (let index = 0; index < arrangedDefinitions.length; index += 1) {
+    if (!arrangedDefinitions[index]) {
+      arrangedDefinitions[index] = remainingTiles[remainingIndex];
+      remainingIndex += 1;
+    }
+  }
+
+  return arrangedDefinitions;
+}
+
+function getOptimalLanguagePositions(languageCount, blockedIndices = []) {
+  const blockedIndexSet = new Set(blockedIndices);
+  const availableIndices = [];
+
+  for (let index = 0; index < expectedTileCount; index += 1) {
+    if (!blockedIndexSet.has(index)) {
+      availableIndices.push(index);
+    }
+  }
+
+  let bestAdjacencyCount = Number.POSITIVE_INFINITY;
+  const bestCombinations = [];
+
+  function search(startIndex, currentCombination) {
+    if (currentCombination.length === languageCount) {
+      const adjacencyCount = countOrthogonalAdjacencies(currentCombination);
+
+      if (adjacencyCount < bestAdjacencyCount) {
+        bestAdjacencyCount = adjacencyCount;
+        bestCombinations.length = 0;
+        bestCombinations.push([...currentCombination]);
+      } else if (adjacencyCount === bestAdjacencyCount) {
+        bestCombinations.push([...currentCombination]);
+      }
+
+      return;
+    }
+
+    const needed = languageCount - currentCombination.length;
+
+    for (let index = startIndex; index <= availableIndices.length - needed; index += 1) {
+      currentCombination.push(availableIndices[index]);
+      search(index + 1, currentCombination);
+      currentCombination.pop();
+    }
+  }
+
+  search(0, []);
+
+  if (bestCombinations.length === 0) {
+    return [];
+  }
+
+  return shuffleArray(bestCombinations)[0];
+}
+
+function countOrthogonalAdjacencies(indices) {
+  const indexSet = new Set(indices);
+  let adjacencyCount = 0;
+
+  indices.forEach((index) => {
+    const row = Math.floor(index / boardColumns);
+    const column = index % boardColumns;
+    const rightNeighbor = index + 1;
+    const bottomNeighbor = index + boardColumns;
+
+    if (column + 1 < boardColumns && indexSet.has(rightNeighbor)) {
+      adjacencyCount += 1;
+    }
+
+    if (row + 1 < boardRows && indexSet.has(bottomNeighbor)) {
+      adjacencyCount += 1;
+    }
+  });
+
+  return adjacencyCount;
 }
 
 function shuffleArray(items) {
