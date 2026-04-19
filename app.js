@@ -154,6 +154,7 @@ const state = {
   activeTileId: null,
   selectedOptions: [],
   pointsBurstTimer: null,
+  isSubmitting: false,
 };
 
 const elements = {
@@ -275,7 +276,7 @@ function handleOptionGridClick(event) {
     return;
   }
 
-  if (elements.submitButton.disabled) {
+  if (state.isSubmitting) {
     return;
   }
 
@@ -335,7 +336,7 @@ function openModal(tile) {
 }
 
 function closeModal(force = false) {
-  if (!force && elements.submitButton.disabled) {
+  if (!force && state.isSubmitting) {
     return;
   }
 
@@ -473,6 +474,8 @@ function updateAnswerControls(tile) {
   elements.answerInput.hidden = isMultiSelect;
   elements.answerInput.disabled = false;
   elements.selectionSummary.hidden = !isMultiSelect;
+  elements.answerInput.style.display = isMultiSelect ? "none" : "";
+  elements.selectionSummary.style.display = isMultiSelect ? "grid" : "none";
 
   if (isMultiSelect) {
     const requiredSelections = tile.selectionLimit || 3;
@@ -494,6 +497,8 @@ function setFeedback(message, typeClass) {
 }
 
 function setSubmitBusy(isBusy) {
+  state.isSubmitting = isBusy;
+
   const tile = getActiveTile();
 
   elements.closeModalButton.disabled = isBusy;
