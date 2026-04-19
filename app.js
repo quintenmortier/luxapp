@@ -1,5 +1,6 @@
-const boardSize = 4;
-const expectedTileCount = boardSize * boardSize;
+const boardRows = 5;
+const boardColumns = 3;
+const expectedTileCount = boardRows * boardColumns;
 const BIOMETRIC_CREDENTIAL_KEY = "lux-bingo.biometric-credential-id";
 const BIOMETRIC_USER_ID_KEY = "lux-bingo.biometric-user-id";
 
@@ -62,15 +63,23 @@ const tileDefinitions = [
   },
   {
     id: "tile-6",
-    label: "Fruit",
-    question: "Which curved fruit is usually yellow when ripe?",
-    answers: ["banana", "a banana"],
+    label: "Degas",
+    question: "Which painter?",
+    imageSrc: "images/degas.jpg",
+    imageAlt: "An artwork associated with Degas.",
+    manualVerification: true,
+    blankPoints: 1,
+    correctPoints: 2,
   },
   {
     id: "tile-7",
-    label: "Orbit",
-    question: "What star does Earth orbit?",
-    answers: ["sun", "the sun"],
+    label: "Schreeuw",
+    question: "Which painting?",
+    imageSrc: "images/schreeuw.jpg",
+    imageAlt: "An expressionist artwork associated with The Scream.",
+    manualVerification: true,
+    blankPoints: 1,
+    correctPoints: 2,
   },
   {
     id: "tile-8",
@@ -97,7 +106,7 @@ const tileDefinitions = [
     imageSrc: "images/italian.png",
     imageAlt: "A themed image for the Italian prompt.",
     inputMode: "verify-only",
-    tileImageFit: "contain",
+    tileImageFit: "cover",
     tileImagePosition: "center center",
     correctPoints: 1,
   },
@@ -108,7 +117,7 @@ const tileDefinitions = [
     imageSrc: "images/arabic.png",
     imageAlt: "A themed image for the Arabic prompt.",
     inputMode: "verify-only",
-    tileImageFit: "contain",
+    tileImageFit: "cover",
     tileImagePosition: "center center",
     correctPoints: 1,
   },
@@ -119,7 +128,7 @@ const tileDefinitions = [
     imageSrc: "images/latin.png",
     imageAlt: "A themed image for the Latin prompt.",
     inputMode: "verify-only",
-    tileImageFit: "contain",
+    tileImageFit: "cover",
     tileImagePosition: "center center",
     correctPoints: 1,
   },
@@ -130,7 +139,7 @@ const tileDefinitions = [
     imageSrc: "images/mandarin.png",
     imageAlt: "A themed image for the Mandarin prompt.",
     inputMode: "verify-only",
-    tileImageFit: "contain",
+    tileImageFit: "cover",
     tileImagePosition: "center center",
     correctPoints: 1,
   },
@@ -180,7 +189,7 @@ const tileDefinitions = [
   },
 ];
 
-const lineDefinitions = buildLineDefinitions(boardSize);
+const lineDefinitions = buildLineDefinitions(boardRows, boardColumns);
 
 const state = {
   tiles: createTiles(),
@@ -188,8 +197,8 @@ const state = {
   completedLines: new Set(),
   activeTileId: null,
   selectedOptions: [],
-  pendingVerification: null,
   pointsBurstTimer: null,
+  bingoBurstTimer: null,
   isSubmitting: false,
 };
 
@@ -198,6 +207,7 @@ const elements = {
   scorePill: document.querySelector("#score-pill"),
   scoreValue: document.querySelector("#score-value"),
   pointsBurst: document.querySelector("#points-burst"),
+  bingoBurst: document.querySelector("#bingo-burst"),
   modal: document.querySelector("#question-modal"),
   modalImage: document.querySelector("#modal-image"),
   modalPrompt: document.querySelector("#modal-prompt"),
@@ -216,7 +226,7 @@ render();
 bindEvents();
 
 function createTiles() {
-  const shuffledDefinitions = shuffleArray(tileDefinitions.slice(0, expectedTileCount));
+  const shuffledDefinitions = shuffleArray(tileDefinitions).slice(0, expectedTileCount);
   const tiles = shuffledDefinitions.map((tile, index) => ({
     ...tile,
     index,
@@ -224,7 +234,7 @@ function createTiles() {
   }));
 
   if (tiles.length !== expectedTileCount) {
-    console.warn(`Expected ${expectedTileCount} tiles for a ${boardSize}x${boardSize} board.`);
+    console.warn(`Expected ${expectedTileCount} tiles for a ${boardRows}x${boardColumns} board.`);
   }
 
   return tiles;
@@ -347,7 +357,6 @@ function handleOptionGridClick(event) {
 function openModal(tile) {
   state.activeTileId = tile.id;
   state.selectedOptions = [];
-  state.pendingVerification = null;
 
   if (tile.imageSrc) {
     elements.modalImage.src = tile.imageSrc;
@@ -364,18 +373,13 @@ function openModal(tile) {
   setFeedback("", "");
   setSubmitBusy(false);
   renderOptionGrid(tile);
-  renderReviewPanel();
   updateAnswerControls(tile);
+  elements.reviewPanel.hidden = true;
+  elements.reviewPanel.innerHTML = "";
 
   elements.modal.classList.add("is-open");
   elements.modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
-
-  if (getTileInputMode(tile) === "text") {
-    window.requestAnimationFrame(() => {
-      elements.answerInput.focus();
-    });
-  }
 }
 
 function closeModal(force = false) {
@@ -385,7 +389,6 @@ function closeModal(force = false) {
 
   state.activeTileId = null;
   state.selectedOptions = [];
-  state.pendingVerification = null;
 
   elements.modal.classList.remove("is-open");
   elements.modal.setAttribute("aria-hidden", "true");
@@ -393,7 +396,8 @@ function closeModal(force = false) {
   elements.answerInput.value = "";
   elements.optionGrid.innerHTML = "";
   elements.optionGrid.hidden = true;
-  renderReviewPanel();
+  elements.reviewPanel.hidden = true;
+  elements.reviewPanel.innerHTML = "";
   setFeedback("", "");
   setSubmitBusy(false);
 }
@@ -406,14 +410,9 @@ async function handleAnswerSubmit(event) {
     return;
   }
 
-  if (state.pendingVerification) {
-    await handlePendingVerification(tile);
-    return;
-  }
-
   if (getTileInputMode(tile) === "multi-select") {
     if (usesManualVerification(tile)) {
-      startMultiSelectVerification(tile);
+      await handleManualMultiSelectSubmit(tile);
       return;
     }
     await handleMultiSelectSubmit(tile);
@@ -426,7 +425,7 @@ async function handleAnswerSubmit(event) {
   }
 
   if (usesManualVerification(tile)) {
-    startTextVerification(tile);
+    await handleManualTextSubmit(tile);
     return;
   }
 
@@ -451,9 +450,9 @@ async function handleAnswerSubmit(event) {
   }
 }
 
-async function handlePendingVerification(tile) {
-  const pendingVerification = state.pendingVerification;
-  if (!pendingVerification) {
+async function handleManualTextSubmit(tile) {
+  const attempt = evaluateManualTextAttempt(tile, elements.answerInput.value);
+  if (!attempt) {
     return;
   }
 
@@ -462,16 +461,14 @@ async function handlePendingVerification(tile) {
 
   try {
     await performBiometricVerification();
-    const totalPoints = solveTile(tile, pendingVerification.points);
+    const totalPoints = solveTile(tile, attempt.basePoints);
     closeModal(true);
     showPointsBurst(totalPoints);
   } catch (error) {
-    setFeedback(getPendingVerificationErrorMessage(error), "is-error");
+    setFeedback(getVerificationErrorMessage(error), "is-error");
   } finally {
     setSubmitBusy(false);
-    if (state.activeTileId === tile.id) {
-      updateAnswerControls(tile);
-    }
+    updateAnswerControls(tile);
   }
 }
 
@@ -494,6 +491,29 @@ async function handleMultiSelectSubmit(tile) {
     }
 
     const totalPoints = solveTile(tile, attempt.basePoints);
+    closeModal(true);
+    showPointsBurst(totalPoints);
+  } catch (error) {
+    setFeedback(getVerificationErrorMessage(error), "is-error");
+  } finally {
+    setSubmitBusy(false);
+    updateAnswerControls(tile);
+  }
+}
+
+async function handleManualMultiSelectSubmit(tile) {
+  const requiredSelections = tile.selectionLimit || 3;
+  if (state.selectedOptions.length !== requiredSelections) {
+    setFeedback(`Select ${requiredSelections} songs first.`, "is-error");
+    return;
+  }
+
+  setSubmitBusy(true);
+  setFeedback("", "");
+
+  try {
+    await performBiometricVerification();
+    const totalPoints = solveTile(tile, tile.verifiedPoints || 1);
     closeModal(true);
     showPointsBurst(totalPoints);
   } catch (error) {
@@ -566,37 +586,11 @@ function evaluateMultiSelectAttempt(tile) {
   };
 }
 
-function startTextVerification(tile) {
-  const answerText = elements.answerInput.value.trim();
-  const hasAnswer = answerText.length > 0;
-
-  state.pendingVerification = {
-    kind: "text",
-    points: hasAnswer ? tile.correctPoints || 2 : tile.blankPoints || 1,
-    answerText,
+function evaluateManualTextAttempt(tile, rawAnswer) {
+  const hasAnswer = rawAnswer.trim().length > 0;
+  return {
+    basePoints: hasAnswer ? tile.correctPoints || 2 : tile.blankPoints || 1,
   };
-
-  renderReviewPanel();
-  updateAnswerControls(tile);
-  setFeedback("", "");
-}
-
-function startMultiSelectVerification(tile) {
-  const requiredSelections = tile.selectionLimit || 3;
-  if (state.selectedOptions.length !== requiredSelections) {
-    setFeedback(`Select ${requiredSelections} songs first.`, "is-error");
-    return;
-  }
-
-  state.pendingVerification = {
-    kind: "multi-select",
-    points: tile.verifiedPoints || 1,
-    selections: [...state.selectedOptions],
-  };
-
-  renderReviewPanel();
-  updateAnswerControls(tile);
-  setFeedback("", "");
 }
 
 function renderOptionGrid(tile) {
@@ -627,57 +621,21 @@ function renderOptionGrid(tile) {
     .join("");
 }
 
-function renderReviewPanel() {
-  const pendingVerification = state.pendingVerification;
-  if (!pendingVerification) {
-    elements.reviewPanel.hidden = true;
-    elements.reviewPanel.className = "review-panel";
-    elements.reviewPanel.innerHTML = "";
-    return;
-  }
-
-  if (pendingVerification.kind === "multi-select") {
-    elements.reviewPanel.className = "review-panel is-selection";
-    elements.reviewPanel.innerHTML = `
-      <div class="review-chip-list">
-        ${pendingVerification.selections
-          .map((selection) => `<span class="review-chip">${escapeHtml(selection)}</span>`)
-          .join("")}
-      </div>
-    `;
-  } else {
-    elements.reviewPanel.className = "review-panel";
-    elements.reviewPanel.innerHTML = `
-      <div class="review-text">${
-        pendingVerification.answerText
-          ? escapeHtml(pendingVerification.answerText)
-          : '<span class="review-empty">No answer</span>'
-      }</div>
-    `;
-  }
-
-  elements.reviewPanel.hidden = false;
-}
-
 function updateAnswerControls(tile) {
   const inputMode = getTileInputMode(tile);
   const isMultiSelect = inputMode === "multi-select";
   const isVerifyOnly = inputMode === "verify-only";
-  const isReviewing = Boolean(state.pendingVerification);
 
   elements.answerForm.classList.toggle("is-verify-only", isVerifyOnly);
-  elements.answerForm.classList.toggle("is-reviewing", isReviewing);
-  elements.answerInput.hidden = isMultiSelect || isVerifyOnly || isReviewing;
-  elements.answerInput.disabled = isVerifyOnly || isReviewing;
-  elements.selectionSummary.hidden = !isMultiSelect || isReviewing;
-  elements.answerInput.style.display = isMultiSelect || isVerifyOnly || isReviewing ? "none" : "";
-  elements.selectionSummary.style.display = isMultiSelect && !isReviewing ? "grid" : "none";
-  elements.optionGrid.hidden = !isMultiSelect || isReviewing;
-
-  if (isReviewing) {
-    elements.submitButton.disabled = false;
-    return;
-  }
+  elements.answerForm.classList.remove("is-reviewing");
+  elements.answerInput.hidden = isMultiSelect || isVerifyOnly;
+  elements.answerInput.disabled = isVerifyOnly;
+  elements.selectionSummary.hidden = !isMultiSelect;
+  elements.answerInput.style.display = isMultiSelect || isVerifyOnly ? "none" : "";
+  elements.selectionSummary.style.display = isMultiSelect ? "grid" : "none";
+  elements.optionGrid.hidden = !isMultiSelect;
+  elements.reviewPanel.hidden = true;
+  elements.reviewPanel.innerHTML = "";
 
   if (isMultiSelect) {
     const requiredSelections = tile.selectionLimit || 3;
@@ -703,16 +661,9 @@ function setSubmitBusy(isBusy) {
 
   const tile = getActiveTile();
   const inputMode = tile ? getTileInputMode(tile) : "text";
-  const isReviewing = Boolean(state.pendingVerification);
 
   elements.closeModalButton.disabled = isBusy;
   elements.submitButton.textContent = isBusy ? "..." : "OK";
-
-  if (isReviewing) {
-    elements.answerInput.disabled = true;
-    elements.submitButton.disabled = isBusy;
-    return;
-  }
 
   if (inputMode === "multi-select") {
     elements.submitButton.disabled = isBusy || state.selectedOptions.length !== (tile.selectionLimit || 3);
@@ -730,13 +681,18 @@ function solveTile(tile, basePoints) {
   tile.solved = true;
 
   const newlyCompletedLines = collectNewlyCompletedLines(tile.index);
-  const totalPoints = basePoints + newlyCompletedLines.length * 3;
+  const bingoPoints = newlyCompletedLines.reduce((total, line) => total + line.points, 0);
+  const totalPoints = basePoints + bingoPoints;
 
   state.score += totalPoints;
 
   renderBoard();
   renderScore();
   pulseScore();
+
+  if (newlyCompletedLines.length > 0) {
+    showBingoBurst(newlyCompletedLines.length);
+  }
 
   return totalPoints;
 }
@@ -747,7 +703,6 @@ function resetGame() {
   state.completedLines = new Set();
   state.activeTileId = null;
   state.selectedOptions = [];
-  state.pendingVerification = null;
   render();
   closeModal(true);
 }
@@ -770,6 +725,18 @@ function showPointsBurst(points) {
   }, 1100);
 }
 
+function showBingoBurst(completedLineCount) {
+  clearTimeout(state.bingoBurstTimer);
+  elements.bingoBurst.textContent = completedLineCount > 1 ? `BINGO x${completedLineCount}!` : "BINGO!";
+  elements.bingoBurst.classList.remove("is-visible");
+  void elements.bingoBurst.offsetWidth;
+  elements.bingoBurst.classList.add("is-visible");
+
+  state.bingoBurstTimer = window.setTimeout(() => {
+    elements.bingoBurst.classList.remove("is-visible");
+  }, 1400);
+}
+
 function collectNewlyCompletedLines(tileIndex) {
   const relevantLines = lineDefinitions.filter((line) => line.indices.includes(tileIndex));
   const completedNow = [];
@@ -778,54 +745,39 @@ function collectNewlyCompletedLines(tileIndex) {
     const isSolved = line.indices.every((index) => state.tiles[index]?.solved);
     if (isSolved && !state.completedLines.has(line.id)) {
       state.completedLines.add(line.id);
-      completedNow.push(line.id);
+      completedNow.push(line);
     }
   });
 
   return completedNow;
 }
 
-function buildLineDefinitions(size) {
+function buildLineDefinitions(rows, columns) {
   const lines = [];
 
-  for (let row = 0; row < size; row += 1) {
+  for (let row = 0; row < rows; row += 1) {
     const indices = [];
-    for (let column = 0; column < size; column += 1) {
-      indices.push(row * size + column);
+    for (let column = 0; column < columns; column += 1) {
+      indices.push(row * columns + column);
     }
     lines.push({
       id: `row-${row}`,
       indices,
+      points: 1,
     });
   }
 
-  for (let column = 0; column < size; column += 1) {
+  for (let column = 0; column < columns; column += 1) {
     const indices = [];
-    for (let row = 0; row < size; row += 1) {
-      indices.push(row * size + column);
+    for (let row = 0; row < rows; row += 1) {
+      indices.push(row * columns + column);
     }
     lines.push({
       id: `column-${column}`,
       indices,
+      points: 3,
     });
   }
-
-  const diagonalOne = [];
-  const diagonalTwo = [];
-
-  for (let index = 0; index < size; index += 1) {
-    diagonalOne.push(index * size + index);
-    diagonalTwo.push(index * size + (size - 1 - index));
-  }
-
-  lines.push({
-    id: "diagonal-main",
-    indices: diagonalOne,
-  });
-  lines.push({
-    id: "diagonal-anti",
-    indices: diagonalTwo,
-  });
 
   return lines;
 }
@@ -994,14 +946,6 @@ function getVerificationErrorMessage(error) {
   }
 
   return "Verification failed. Try again.";
-}
-
-function getPendingVerificationErrorMessage(error) {
-  if (error instanceof DOMException && error.name === "NotAllowedError") {
-    return "Not verified. Try again later.";
-  }
-
-  return getVerificationErrorMessage(error);
 }
 
 function getStoredValue(key) {

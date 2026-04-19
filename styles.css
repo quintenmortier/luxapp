@@ -115,7 +115,7 @@ input {
 
 .bingo-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
 }
 
@@ -225,6 +225,29 @@ input {
 
 .points-burst.is-visible {
   animation: points-burst 1100ms ease forwards;
+}
+
+.bingo-burst {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  z-index: 35;
+  pointer-events: none;
+  padding: 0.7rem 1.25rem;
+  border-radius: 999px;
+  background: rgba(8, 24, 21, 0.88);
+  color: #fff7ee;
+  font-size: clamp(2rem, 10vw, 4rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.28);
+  text-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+.bingo-burst.is-visible {
+  animation: bingo-burst 1400ms ease forwards;
 }
 
 .reset-button,
@@ -586,6 +609,28 @@ input {
   }
 }
 
+@keyframes bingo-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -44%) scale(0.72);
+  }
+
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  72% {
+    opacity: 1;
+    transform: translate(-50%, -54%) scale(1.02);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -58%) scale(1.08);
+  }
+}
+
 @media (max-width: 520px) {
   .app-shell {
     padding-inline: 0.6rem;
@@ -670,5 +715,10 @@ input {
 
   .points-burst {
     top: calc(1rem + env(safe-area-inset-top));
+  }
+
+  .bingo-burst {
+    width: min(calc(100vw - 1.2rem), 420px);
+    text-align: center;
   }
 }
