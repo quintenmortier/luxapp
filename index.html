@@ -54,6 +54,7 @@
           <img id="modal-image" class="modal-image" alt="" hidden />
           <div class="modal-overlay">
             <h1 id="modal-prompt" class="modal-prompt">Question</h1>
+            <div id="option-grid" class="option-grid" hidden></div>
 
             <form id="answer-form" class="answer-form">
               <label class="sr-only" for="answer-input">Answer</label>
@@ -70,34 +71,13 @@
                   enterkeyhint="done"
                   placeholder="Answer"
                 />
+                <div id="selection-summary" class="selection-summary" hidden>Select 3</div>
                 <button class="submit-button" type="submit" aria-label="Check answer">
                   OK
                 </button>
               </div>
               <p id="answer-feedback" class="answer-feedback" aria-live="polite"></p>
             </form>
-
-            <section id="verify-panel" class="verify-panel" hidden>
-              <div class="verify-card">
-                <span class="verify-label">Submitted</span>
-                <p id="verify-answer" class="verify-answer">Answer</p>
-              </div>
-
-              <div class="verify-actions">
-                <button id="edit-answer-button" class="secondary-button" type="button">
-                  Edit
-                </button>
-                <button
-                  id="verify-answer-button"
-                  class="submit-button verify-button"
-                  type="button"
-                >
-                  Verify
-                </button>
-              </div>
-
-              <p id="verify-feedback" class="answer-feedback verify-feedback" aria-live="polite"></p>
-            </section>
           </div>
         </div>
       </section>

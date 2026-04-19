@@ -103,15 +103,45 @@ const tileDefinitions = [
   },
   {
     id: "tile-15",
-    label: "Opposite",
-    question: "What is the opposite of cold?",
-    answers: ["hot", "warm"],
+    label: "LUX",
+    question: "Select three songs from LUX that have already been played.",
+    imageSrc: "images/lux.jpg",
+    imageAlt: "The album cover for LUX.",
+    inputMode: "multi-select",
+    selectionLimit: 3,
+    options: [
+      "Berghain",
+      "La Perla",
+      "Mundo Nuevo",
+      "Porcelana",
+      "Mio Cristo",
+      "Magnolias",
+      "Reliquia",
+      "De Madruga",
+    ],
+    correctOptions: ["Berghain", "La Perla", "Magnolias"],
+    correctPoints: 2,
   },
   {
     id: "tile-16",
-    label: "Travel",
-    question: "What vehicle flies in the sky and carries passengers?",
-    answers: ["plane", "airplane", "a plane", "an airplane"],
+    label: "MOTOMAMI",
+    question: "Select three songs from MOTOMAMI that have already been played.",
+    imageSrc: "images/motomami.jpg",
+    imageAlt: "The album cover for MOTOMAMI.",
+    inputMode: "multi-select",
+    selectionLimit: 3,
+    options: [
+      "Saoko",
+      "Candy",
+      "La Fama",
+      "Bulerias",
+      "Chicken Teriyaki",
+      "Hentai",
+      "Bizcochito",
+      "Delirio de Grandeza",
+    ],
+    correctOptions: ["Saoko", "La Fama", "Bizcochito"],
+    correctPoints: 2,
   },
 ];
 
@@ -122,8 +152,7 @@ const state = {
   score: 0,
   completedLines: new Set(),
   activeTileId: null,
-  modalMode: "answer",
-  pendingAttempt: null,
+  selectedOptions: [],
   pointsBurstTimer: null,
 };
 
@@ -135,14 +164,12 @@ const elements = {
   modal: document.querySelector("#question-modal"),
   modalImage: document.querySelector("#modal-image"),
   modalPrompt: document.querySelector("#modal-prompt"),
+  optionGrid: document.querySelector("#option-grid"),
   answerForm: document.querySelector("#answer-form"),
   answerInput: document.querySelector("#answer-input"),
+  selectionSummary: document.querySelector("#selection-summary"),
   answerFeedback: document.querySelector("#answer-feedback"),
-  verifyPanel: document.querySelector("#verify-panel"),
-  verifyAnswer: document.querySelector("#verify-answer"),
-  verifyFeedback: document.querySelector("#verify-feedback"),
-  editAnswerButton: document.querySelector("#edit-answer-button"),
-  verifyAnswerButton: document.querySelector("#verify-answer-button"),
+  submitButton: document.querySelector("#answer-form .submit-button"),
   closeModalButton: document.querySelector("#close-modal-button"),
   resetButton: document.querySelector("#reset-button"),
 };
@@ -166,9 +193,8 @@ function createTiles() {
 
 function bindEvents() {
   elements.board.addEventListener("click", handleBoardClick);
+  elements.optionGrid.addEventListener("click", handleOptionGridClick);
   elements.answerForm.addEventListener("submit", handleAnswerSubmit);
-  elements.editAnswerButton.addEventListener("click", returnToEditMode);
-  elements.verifyAnswerButton.addEventListener("click", handleVerifyAttempt);
   elements.resetButton.addEventListener("click", resetGame);
   elements.closeModalButton.addEventListener("click", () => closeModal());
   elements.modal.addEventListener("click", (event) => {
@@ -238,9 +264,47 @@ function handleBoardClick(event) {
   openModal(tile);
 }
 
+function handleOptionGridClick(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const optionButton = target.closest("[data-option-value]");
+  if (!(optionButton instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  if (elements.submitButton.disabled) {
+    return;
+  }
+
+  const tile = getActiveTile();
+  if (!tile || tile.inputMode !== "multi-select") {
+    return;
+  }
+
+  const optionValue = optionButton.dataset.optionValue;
+  if (!optionValue) {
+    return;
+  }
+
+  const currentSelection = new Set(state.selectedOptions);
+  if (currentSelection.has(optionValue)) {
+    currentSelection.delete(optionValue);
+  } else if (currentSelection.size < (tile.selectionLimit || 3)) {
+    currentSelection.add(optionValue);
+  }
+
+  state.selectedOptions = Array.from(currentSelection);
+  renderOptionGrid(tile);
+  updateAnswerControls(tile);
+  setFeedback("", "");
+}
+
 function openModal(tile) {
   state.activeTileId = tile.id;
-  state.pendingAttempt = null;
+  state.selectedOptions = [];
 
   if (tile.imageSrc) {
     elements.modalImage.src = tile.imageSrc;
@@ -254,43 +318,41 @@ function openModal(tile) {
 
   elements.modalPrompt.textContent = tile.question;
   elements.answerInput.value = "";
-  elements.answerInput.placeholder = tile.blankPoints ? "Answer or leave blank" : "Answer";
-  elements.verifyAnswer.textContent = "";
   setFeedback("", "");
-  setVerifyFeedback("", "");
-  setVerifyBusy(false);
-  setModalMode("answer");
+  setSubmitBusy(false);
+  renderOptionGrid(tile);
+  updateAnswerControls(tile);
 
   elements.modal.classList.add("is-open");
   elements.modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
 
-  window.requestAnimationFrame(() => {
-    elements.answerInput.focus();
-  });
+  if (tile.inputMode !== "multi-select") {
+    window.requestAnimationFrame(() => {
+      elements.answerInput.focus();
+    });
+  }
 }
 
 function closeModal(force = false) {
-  if (!force && elements.verifyAnswerButton.disabled) {
+  if (!force && elements.submitButton.disabled) {
     return;
   }
 
   state.activeTileId = null;
-  state.pendingAttempt = null;
-  state.modalMode = "answer";
+  state.selectedOptions = [];
 
   elements.modal.classList.remove("is-open");
   elements.modal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("modal-open");
   elements.answerInput.value = "";
-  elements.verifyAnswer.textContent = "";
+  elements.optionGrid.innerHTML = "";
+  elements.optionGrid.hidden = true;
   setFeedback("", "");
-  setVerifyFeedback("", "");
-  setVerifyBusy(false);
-  setModalMode("answer");
+  setSubmitBusy(false);
 }
 
-function handleAnswerSubmit(event) {
+async function handleAnswerSubmit(event) {
   event.preventDefault();
 
   const tile = getActiveTile();
@@ -298,18 +360,36 @@ function handleAnswerSubmit(event) {
     return;
   }
 
-  const attempt = evaluateAttempt(tile, elements.answerInput.value);
+  const attempt = evaluateAttempt(tile);
   if (!attempt) {
     return;
   }
 
-  state.pendingAttempt = attempt;
-  elements.verifyAnswer.textContent = attempt.answerDisplay;
-  setVerifyFeedback("", "");
-  setModalMode("confirm");
+  setSubmitBusy(true);
+  setFeedback("", "");
+
+  try {
+    await performBiometricVerification();
+    const totalPoints = solveTile(tile, attempt.basePoints);
+    closeModal(true);
+    showPointsBurst(totalPoints);
+  } catch (error) {
+    setFeedback(getVerificationErrorMessage(error), "is-error");
+  } finally {
+    setSubmitBusy(false);
+    updateAnswerControls(tile);
+  }
 }
 
-function evaluateAttempt(tile, rawAnswer) {
+function evaluateAttempt(tile) {
+  if (tile.inputMode === "multi-select") {
+    return evaluateMultiSelectAttempt(tile);
+  }
+
+  return evaluateTextAttempt(tile, elements.answerInput.value);
+}
+
+function evaluateTextAttempt(tile, rawAnswer) {
   const normalizedAnswer = normalizeText(rawAnswer);
 
   if (!normalizedAnswer && !tile.blankPoints) {
@@ -319,9 +399,6 @@ function evaluateAttempt(tile, rawAnswer) {
 
   if (!normalizedAnswer && tile.blankPoints) {
     return {
-      tileId: tile.id,
-      rawAnswer,
-      answerDisplay: "Blank",
       basePoints: tile.blankPoints,
     };
   }
@@ -336,53 +413,76 @@ function evaluateAttempt(tile, rawAnswer) {
   }
 
   return {
-    tileId: tile.id,
-    rawAnswer,
-    answerDisplay: rawAnswer.trim(),
     basePoints: tile.correctPoints || 1,
   };
 }
 
-function returnToEditMode() {
-  if (!state.pendingAttempt) {
+function evaluateMultiSelectAttempt(tile) {
+  const requiredSelections = tile.selectionLimit || 3;
+  if (state.selectedOptions.length !== requiredSelections) {
+    setFeedback(`Select ${requiredSelections} songs first.`, "is-error");
+    return null;
+  }
+
+  const selected = state.selectedOptions.map(normalizeText).sort();
+  const correct = tile.correctOptions.map(normalizeText).sort();
+  const isCorrect =
+    selected.length === correct.length &&
+    selected.every((value, index) => value === correct[index]);
+
+  if (!isCorrect) {
+    setFeedback("Not quite. Try again.", "is-error");
+    return null;
+  }
+
+  return {
+    basePoints: tile.correctPoints || 2,
+  };
+}
+
+function renderOptionGrid(tile) {
+  const isMultiSelect = tile.inputMode === "multi-select";
+  elements.optionGrid.hidden = !isMultiSelect;
+
+  if (!isMultiSelect) {
+    elements.optionGrid.innerHTML = "";
     return;
   }
 
-  setVerifyFeedback("", "");
-  setModalMode("answer");
-  elements.answerInput.value = state.pendingAttempt.rawAnswer;
-
-  window.requestAnimationFrame(() => {
-    elements.answerInput.focus();
-  });
+  const selectedOptions = new Set(state.selectedOptions);
+  elements.optionGrid.innerHTML = tile.options
+    .map((option) => {
+      const isSelected = selectedOptions.has(option);
+      const selectedClass = isSelected ? "is-selected" : "";
+      return `
+        <button
+          class="option-chip ${selectedClass}"
+          type="button"
+          data-option-value="${escapeHtml(option)}"
+          aria-pressed="${isSelected ? "true" : "false"}"
+        >
+          ${escapeHtml(option)}
+        </button>
+      `;
+    })
+    .join("");
 }
 
-async function handleVerifyAttempt() {
-  const tile = getActiveTile();
-  if (!tile || !state.pendingAttempt) {
-    return;
+function updateAnswerControls(tile) {
+  const isMultiSelect = tile.inputMode === "multi-select";
+  elements.answerInput.hidden = isMultiSelect;
+  elements.answerInput.disabled = false;
+  elements.selectionSummary.hidden = !isMultiSelect;
+
+  if (isMultiSelect) {
+    const requiredSelections = tile.selectionLimit || 3;
+    const selectedCount = state.selectedOptions.length;
+    elements.selectionSummary.textContent = `${selectedCount} / ${requiredSelections} selected`;
+    elements.submitButton.disabled = selectedCount !== requiredSelections;
+  } else {
+    elements.answerInput.placeholder = tile.blankPoints ? "Answer or leave blank" : "Answer";
+    elements.submitButton.disabled = false;
   }
-
-  setVerifyBusy(true);
-  setVerifyFeedback("", "");
-
-  try {
-    await performBiometricVerification();
-    const totalPoints = solveTile(tile, state.pendingAttempt.basePoints);
-    closeModal(true);
-    showPointsBurst(totalPoints);
-  } catch (error) {
-    setVerifyFeedback(getVerificationErrorMessage(error), "is-error");
-  } finally {
-    setVerifyBusy(false);
-  }
-}
-
-function setModalMode(mode) {
-  state.modalMode = mode;
-  const isConfirming = mode === "confirm";
-  elements.answerForm.hidden = isConfirming;
-  elements.verifyPanel.hidden = !isConfirming;
 }
 
 function setFeedback(message, typeClass) {
@@ -393,19 +493,22 @@ function setFeedback(message, typeClass) {
   }
 }
 
-function setVerifyFeedback(message, typeClass) {
-  elements.verifyFeedback.textContent = message;
-  elements.verifyFeedback.className = "answer-feedback verify-feedback";
-  if (typeClass) {
-    elements.verifyFeedback.classList.add(typeClass);
-  }
-}
+function setSubmitBusy(isBusy) {
+  const tile = getActiveTile();
 
-function setVerifyBusy(isBusy) {
-  elements.verifyAnswerButton.disabled = isBusy;
-  elements.editAnswerButton.disabled = isBusy;
   elements.closeModalButton.disabled = isBusy;
-  elements.verifyAnswerButton.textContent = isBusy ? "..." : "Verify";
+  elements.submitButton.textContent = isBusy ? "..." : "OK";
+
+  if (tile?.inputMode === "multi-select") {
+    elements.submitButton.disabled = isBusy || state.selectedOptions.length !== (tile.selectionLimit || 3);
+    const optionButtons = elements.optionGrid.querySelectorAll(".option-chip");
+    optionButtons.forEach((button) => {
+      button.disabled = isBusy;
+    });
+  } else {
+    elements.answerInput.disabled = isBusy;
+    elements.submitButton.disabled = isBusy;
+  }
 }
 
 function solveTile(tile, basePoints) {
@@ -428,7 +531,7 @@ function resetGame() {
   state.score = 0;
   state.completedLines = new Set();
   state.activeTileId = null;
-  state.pendingAttempt = null;
+  state.selectedOptions = [];
   render();
   closeModal(true);
 }
@@ -702,6 +805,15 @@ function normalizeText(value) {
     .toLowerCase()
     .replace(/[^\w\s]/g, "")
     .replace(/\s+/g, " ");
+}
+
+function escapeHtml(value) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 if ("serviceWorker" in navigator) {
