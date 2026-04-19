@@ -4,6 +4,8 @@ const expectedTileCount = boardRows * boardColumns;
 const centerTileIndex = Math.floor(boardRows / 2) * boardColumns + Math.floor(boardColumns / 2);
 const BIOMETRIC_CREDENTIAL_KEY = "lux-bingo.biometric-credential-id";
 const BIOMETRIC_USER_ID_KEY = "lux-bingo.biometric-user-id";
+const IOS_VERIFICATION_PIN_KEY = "lux-bingo.ios-verification-pin";
+const DEFAULT_IOS_VERIFICATION_PIN = "2026";
 
 // Replace the label, question, and answers values below with your own box content.
 const tileDefinitions = [
@@ -204,6 +206,7 @@ const tileDefinitions = [
 const lineDefinitions = buildLineDefinitions(boardRows, boardColumns);
 
 const state = {
+  hasStarted: false,
   tiles: createTiles({ useOpeningLayout: true }),
   score: 0,
   completedLines: new Set(),
@@ -215,6 +218,9 @@ const state = {
 };
 
 const elements = {
+  appShell: document.querySelector("#app-shell"),
+  startScreen: document.querySelector("#start-screen"),
+  startButton: document.querySelector("#start-button"),
   board: document.querySelector("#bingo-board"),
   scorePill: document.querySelector("#score-pill"),
   scoreValue: document.querySelector("#score-value"),
@@ -257,6 +263,7 @@ function createTiles(options = {}) {
 }
 
 function bindEvents() {
+  elements.startButton.addEventListener("click", startGame);
   elements.board.addEventListener("click", handleBoardClick);
   elements.optionGrid.addEventListener("click", handleOptionGridClick);
   elements.answerForm.addEventListener("submit", handleAnswerSubmit);
@@ -278,8 +285,23 @@ function bindEvents() {
 }
 
 function render() {
+  renderGameVisibility();
   renderBoard();
   renderScore();
+}
+
+function renderGameVisibility() {
+  elements.startScreen.hidden = state.hasStarted;
+  elements.appShell.hidden = !state.hasStarted;
+}
+
+function startGame() {
+  if (state.hasStarted) {
+    return;
+  }
+
+  state.hasStarted = true;
+  renderGameVisibility();
 }
 
 function renderBoard() {
@@ -454,7 +476,7 @@ async function handleAnswerSubmit(event) {
   setFeedback("", "");
 
   try {
-    await performBiometricVerification();
+    await performVerification();
     const totalPoints = solveTile(tile, attempt.basePoints);
     closeModal(true);
     showPointsBurst(totalPoints);
@@ -476,7 +498,7 @@ async function handleManualTextSubmit(tile) {
   setFeedback("", "");
 
   try {
-    await performBiometricVerification();
+    await performVerification();
     const totalPoints = solveTile(tile, attempt.basePoints);
     closeModal(true);
     showPointsBurst(totalPoints);
@@ -499,7 +521,7 @@ async function handleMultiSelectSubmit(tile) {
   setFeedback("", "");
 
   try {
-    await performBiometricVerification();
+    await performVerification();
 
     const attempt = evaluateMultiSelectAttempt(tile);
     if (!attempt) {
@@ -528,7 +550,7 @@ async function handleManualMultiSelectSubmit(tile) {
   setFeedback("", "");
 
   try {
-    await performBiometricVerification();
+    await performVerification();
     const totalPoints = solveTile(tile, tile.verifiedPoints || 1);
     closeModal(true);
     showPointsBurst(totalPoints);
@@ -545,7 +567,7 @@ async function handleVerifyOnlySubmit(tile) {
   setFeedback("", "");
 
   try {
-    await performBiometricVerification();
+    await performVerification();
     const totalPoints = solveTile(tile, tile.correctPoints || 1);
     closeModal(true);
     showPointsBurst(totalPoints);
@@ -714,13 +736,26 @@ function solveTile(tile, basePoints) {
 }
 
 function resetGame() {
-  state.tiles = createTiles();
+  closeModal(true);
+  clearCelebrationBursts();
+  state.tiles = state.tiles.map((tile) => ({
+    ...tile,
+    solved: false,
+  }));
   state.score = 0;
   state.completedLines = new Set();
   state.activeTileId = null;
   state.selectedOptions = [];
   render();
-  closeModal(true);
+}
+
+function clearCelebrationBursts() {
+  clearTimeout(state.pointsBurstTimer);
+  clearTimeout(state.bingoBurstTimer);
+  state.pointsBurstTimer = null;
+  state.bingoBurstTimer = null;
+  elements.pointsBurst.classList.remove("is-visible");
+  elements.bingoBurst.classList.remove("is-visible");
 }
 
 function pulseScore() {
@@ -941,6 +976,41 @@ function buildTileImageStyle(tile) {
   return styles.join("; ");
 }
 
+async function performVerification() {
+  if (shouldUsePinVerification()) {
+    await performPinVerification();
+    return;
+  }
+
+  await performBiometricVerification();
+}
+
+function shouldUsePinVerification() {
+  return isIOSDevice();
+}
+
+function isIOSDevice() {
+  const userAgent = window.navigator.userAgent || "";
+  const platform = window.navigator.platform || "";
+
+  return (
+    /iPad|iPhone|iPod/i.test(userAgent) ||
+    (platform === "MacIntel" && window.navigator.maxTouchPoints > 1)
+  );
+}
+
+async function performPinVerification() {
+  const enteredPin = window.prompt("Enter verifier PIN", "");
+
+  if (enteredPin === null) {
+    throw new Error("pin-cancelled");
+  }
+
+  if (enteredPin.trim() !== getIosVerificationPin()) {
+    throw new Error("pin-incorrect");
+  }
+}
+
 async function performBiometricVerification() {
   if (!window.isSecureContext) {
     throw new Error("secure-context-required");
@@ -1064,7 +1134,19 @@ function getVerificationErrorMessage(error) {
     return "Biometric verification is not available here.";
   }
 
+  if (error instanceof Error && error.message === "pin-cancelled") {
+    return "PIN entry was cancelled.";
+  }
+
+  if (error instanceof Error && error.message === "pin-incorrect") {
+    return "Incorrect PIN. Try again.";
+  }
+
   return "Verification failed. Try again.";
+}
+
+function getIosVerificationPin() {
+  return getStoredValue(IOS_VERIFICATION_PIN_KEY) || DEFAULT_IOS_VERIFICATION_PIN;
 }
 
 function getStoredValue(key) {

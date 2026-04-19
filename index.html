@@ -20,7 +20,19 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <section id="start-screen" class="start-screen">
+      <img
+        class="start-screen-image"
+        src="images/luxlux.jpg"
+        alt="Luxlux artwork"
+      />
+      <div class="start-screen-overlay">
+        <h1 class="start-screen-title">LUX BINGO</h1>
+        <button id="start-button" class="start-button" type="button">Start</button>
+      </div>
+    </section>
+
+    <main id="app-shell" class="app-shell" hidden>
       <header class="topbar">
         <div class="score-pill" id="score-pill" aria-live="polite">
           <span class="score-pill-label">Score</span>
