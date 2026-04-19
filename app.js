@@ -11,6 +11,7 @@ const tileDefinitions = [
     question: "Which work of art?",
     imageSrc: "images/venus.jpg",
     imageAlt: "A classical marble statue photographed up close.",
+    manualVerification: true,
     answers: ["venus of milo", "venus de milo"],
     blankPoints: 1,
     correctPoints: 2,
@@ -21,6 +22,7 @@ const tileDefinitions = [
     question: "Which mythological figure?",
     imageSrc: "images/icarus.jpg",
     imageAlt: "A dramatic artwork showing a mythological scene.",
+    manualVerification: true,
     answers: ["icarus"],
     blankPoints: 1,
     correctPoints: 2,
@@ -31,21 +33,32 @@ const tileDefinitions = [
     question: "Which painter?",
     imageSrc: "images/Maria Theresa of Spain.jpeg",
     imageAlt: "A formal portrait painting of a royal woman.",
+    manualVerification: true,
     answers: ["diego velazquez", "velazquez", "velasquez"],
     blankPoints: 1,
     correctPoints: 2,
   },
   {
     id: "tile-4",
-    label: "Ocean",
-    question: "Which mammal is known for living in the ocean and using a blowhole?",
-    answers: ["whale", "a whale"],
+    label: "Goya",
+    question: "Which painter?",
+    imageSrc: "images/goya.jpg",
+    imageAlt: "A painting associated with Goya.",
+    manualVerification: true,
+    answers: ["francisco goya", "goya", "francisco jose de goya", "francisco de goya"],
+    blankPoints: 1,
+    correctPoints: 2,
   },
   {
     id: "tile-5",
-    label: "Winter",
-    question: "What is frozen water falling from the sky called?",
-    answers: ["snow"],
+    label: "MonaLisa",
+    question: "Which museum?",
+    imageSrc: "images/monalisa.jpg",
+    imageAlt: "The Mona Lisa painting.",
+    manualVerification: true,
+    answers: ["louvre", "the louvre", "musee du louvre", "musee de louvre", "musee du louvre paris"],
+    blankPoints: 1,
+    correctPoints: 2,
   },
   {
     id: "tile-6",
@@ -79,15 +92,25 @@ const tileDefinitions = [
   },
   {
     id: "tile-11",
-    label: "Storm",
-    question: "What do clouds often bring when they get dark and heavy?",
-    answers: ["rain"],
+    label: "Italian",
+    question: "Italian",
+    imageSrc: "images/italian.png",
+    imageAlt: "A themed image for the Italian prompt.",
+    inputMode: "verify-only",
+    tileImageFit: "contain",
+    tileImagePosition: "center center",
+    correctPoints: 1,
   },
   {
     id: "tile-12",
-    label: "Multiply",
-    question: "What is 4 times 2?",
-    answers: ["8", "eight"],
+    label: "Arabic",
+    question: "Arabic",
+    imageSrc: "images/arabic.png",
+    imageAlt: "A themed image for the Arabic prompt.",
+    inputMode: "verify-only",
+    tileImageFit: "contain",
+    tileImagePosition: "center center",
+    correctPoints: 1,
   },
   {
     id: "tile-13",
@@ -118,6 +141,7 @@ const tileDefinitions = [
     imageSrc: "images/lux.jpg",
     imageAlt: "The album cover for LUX.",
     inputMode: "multi-select",
+    manualVerification: true,
     selectionLimit: 3,
     options: [
       "Berghain",
@@ -130,7 +154,7 @@ const tileDefinitions = [
       "De Madruga",
     ],
     correctOptions: ["Berghain", "La Perla", "Magnolias"],
-    correctPoints: 2,
+    verifiedPoints: 1,
   },
   {
     id: "tile-16",
@@ -139,6 +163,7 @@ const tileDefinitions = [
     imageSrc: "images/motomami.jpg",
     imageAlt: "The album cover for MOTOMAMI.",
     inputMode: "multi-select",
+    manualVerification: true,
     selectionLimit: 3,
     options: [
       "Saoko",
@@ -151,7 +176,7 @@ const tileDefinitions = [
       "Delirio de Grandeza",
     ],
     correctOptions: ["Saoko", "La Fama", "Bizcochito"],
-    correctPoints: 2,
+    verifiedPoints: 1,
   },
 ];
 
@@ -163,6 +188,7 @@ const state = {
   completedLines: new Set(),
   activeTileId: null,
   selectedOptions: [],
+  pendingVerification: null,
   pointsBurstTimer: null,
   isSubmitting: false,
 };
@@ -176,6 +202,7 @@ const elements = {
   modalImage: document.querySelector("#modal-image"),
   modalPrompt: document.querySelector("#modal-prompt"),
   optionGrid: document.querySelector("#option-grid"),
+  reviewPanel: document.querySelector("#review-panel"),
   answerForm: document.querySelector("#answer-form"),
   answerInput: document.querySelector("#answer-input"),
   selectionSummary: document.querySelector("#selection-summary"),
@@ -189,7 +216,8 @@ render();
 bindEvents();
 
 function createTiles() {
-  const tiles = tileDefinitions.slice(0, expectedTileCount).map((tile, index) => ({
+  const shuffledDefinitions = shuffleArray(tileDefinitions.slice(0, expectedTileCount));
+  const tiles = shuffledDefinitions.map((tile, index) => ({
     ...tile,
     index,
     solved: false,
@@ -319,6 +347,7 @@ function handleOptionGridClick(event) {
 function openModal(tile) {
   state.activeTileId = tile.id;
   state.selectedOptions = [];
+  state.pendingVerification = null;
 
   if (tile.imageSrc) {
     elements.modalImage.src = tile.imageSrc;
@@ -335,6 +364,7 @@ function openModal(tile) {
   setFeedback("", "");
   setSubmitBusy(false);
   renderOptionGrid(tile);
+  renderReviewPanel();
   updateAnswerControls(tile);
 
   elements.modal.classList.add("is-open");
@@ -355,6 +385,7 @@ function closeModal(force = false) {
 
   state.activeTileId = null;
   state.selectedOptions = [];
+  state.pendingVerification = null;
 
   elements.modal.classList.remove("is-open");
   elements.modal.setAttribute("aria-hidden", "true");
@@ -362,6 +393,7 @@ function closeModal(force = false) {
   elements.answerInput.value = "";
   elements.optionGrid.innerHTML = "";
   elements.optionGrid.hidden = true;
+  renderReviewPanel();
   setFeedback("", "");
   setSubmitBusy(false);
 }
@@ -374,13 +406,27 @@ async function handleAnswerSubmit(event) {
     return;
   }
 
+  if (state.pendingVerification) {
+    await handlePendingVerification(tile);
+    return;
+  }
+
   if (getTileInputMode(tile) === "multi-select") {
+    if (usesManualVerification(tile)) {
+      startMultiSelectVerification(tile);
+      return;
+    }
     await handleMultiSelectSubmit(tile);
     return;
   }
 
   if (getTileInputMode(tile) === "verify-only") {
     await handleVerifyOnlySubmit(tile);
+    return;
+  }
+
+  if (usesManualVerification(tile)) {
+    startTextVerification(tile);
     return;
   }
 
@@ -402,6 +448,30 @@ async function handleAnswerSubmit(event) {
   } finally {
     setSubmitBusy(false);
     updateAnswerControls(tile);
+  }
+}
+
+async function handlePendingVerification(tile) {
+  const pendingVerification = state.pendingVerification;
+  if (!pendingVerification) {
+    return;
+  }
+
+  setSubmitBusy(true);
+  setFeedback("", "");
+
+  try {
+    await performBiometricVerification();
+    const totalPoints = solveTile(tile, pendingVerification.points);
+    closeModal(true);
+    showPointsBurst(totalPoints);
+  } catch (error) {
+    setFeedback(getPendingVerificationErrorMessage(error), "is-error");
+  } finally {
+    setSubmitBusy(false);
+    if (state.activeTileId === tile.id) {
+      updateAnswerControls(tile);
+    }
   }
 }
 
@@ -496,6 +566,39 @@ function evaluateMultiSelectAttempt(tile) {
   };
 }
 
+function startTextVerification(tile) {
+  const answerText = elements.answerInput.value.trim();
+  const hasAnswer = answerText.length > 0;
+
+  state.pendingVerification = {
+    kind: "text",
+    points: hasAnswer ? tile.correctPoints || 2 : tile.blankPoints || 1,
+    answerText,
+  };
+
+  renderReviewPanel();
+  updateAnswerControls(tile);
+  setFeedback("", "");
+}
+
+function startMultiSelectVerification(tile) {
+  const requiredSelections = tile.selectionLimit || 3;
+  if (state.selectedOptions.length !== requiredSelections) {
+    setFeedback(`Select ${requiredSelections} songs first.`, "is-error");
+    return;
+  }
+
+  state.pendingVerification = {
+    kind: "multi-select",
+    points: tile.verifiedPoints || 1,
+    selections: [...state.selectedOptions],
+  };
+
+  renderReviewPanel();
+  updateAnswerControls(tile);
+  setFeedback("", "");
+}
+
 function renderOptionGrid(tile) {
   const isMultiSelect = getTileInputMode(tile) === "multi-select";
   elements.optionGrid.hidden = !isMultiSelect;
@@ -524,17 +627,57 @@ function renderOptionGrid(tile) {
     .join("");
 }
 
+function renderReviewPanel() {
+  const pendingVerification = state.pendingVerification;
+  if (!pendingVerification) {
+    elements.reviewPanel.hidden = true;
+    elements.reviewPanel.className = "review-panel";
+    elements.reviewPanel.innerHTML = "";
+    return;
+  }
+
+  if (pendingVerification.kind === "multi-select") {
+    elements.reviewPanel.className = "review-panel is-selection";
+    elements.reviewPanel.innerHTML = `
+      <div class="review-chip-list">
+        ${pendingVerification.selections
+          .map((selection) => `<span class="review-chip">${escapeHtml(selection)}</span>`)
+          .join("")}
+      </div>
+    `;
+  } else {
+    elements.reviewPanel.className = "review-panel";
+    elements.reviewPanel.innerHTML = `
+      <div class="review-text">${
+        pendingVerification.answerText
+          ? escapeHtml(pendingVerification.answerText)
+          : '<span class="review-empty">No answer</span>'
+      }</div>
+    `;
+  }
+
+  elements.reviewPanel.hidden = false;
+}
+
 function updateAnswerControls(tile) {
   const inputMode = getTileInputMode(tile);
   const isMultiSelect = inputMode === "multi-select";
   const isVerifyOnly = inputMode === "verify-only";
+  const isReviewing = Boolean(state.pendingVerification);
 
   elements.answerForm.classList.toggle("is-verify-only", isVerifyOnly);
-  elements.answerInput.hidden = isMultiSelect || isVerifyOnly;
-  elements.answerInput.disabled = isVerifyOnly;
-  elements.selectionSummary.hidden = !isMultiSelect;
-  elements.answerInput.style.display = isMultiSelect || isVerifyOnly ? "none" : "";
-  elements.selectionSummary.style.display = isMultiSelect ? "grid" : "none";
+  elements.answerForm.classList.toggle("is-reviewing", isReviewing);
+  elements.answerInput.hidden = isMultiSelect || isVerifyOnly || isReviewing;
+  elements.answerInput.disabled = isVerifyOnly || isReviewing;
+  elements.selectionSummary.hidden = !isMultiSelect || isReviewing;
+  elements.answerInput.style.display = isMultiSelect || isVerifyOnly || isReviewing ? "none" : "";
+  elements.selectionSummary.style.display = isMultiSelect && !isReviewing ? "grid" : "none";
+  elements.optionGrid.hidden = !isMultiSelect || isReviewing;
+
+  if (isReviewing) {
+    elements.submitButton.disabled = false;
+    return;
+  }
 
   if (isMultiSelect) {
     const requiredSelections = tile.selectionLimit || 3;
@@ -560,9 +703,16 @@ function setSubmitBusy(isBusy) {
 
   const tile = getActiveTile();
   const inputMode = tile ? getTileInputMode(tile) : "text";
+  const isReviewing = Boolean(state.pendingVerification);
 
   elements.closeModalButton.disabled = isBusy;
   elements.submitButton.textContent = isBusy ? "..." : "OK";
+
+  if (isReviewing) {
+    elements.answerInput.disabled = true;
+    elements.submitButton.disabled = isBusy;
+    return;
+  }
 
   if (inputMode === "multi-select") {
     elements.submitButton.disabled = isBusy || state.selectedOptions.length !== (tile.selectionLimit || 3);
@@ -597,6 +747,7 @@ function resetGame() {
   state.completedLines = new Set();
   state.activeTileId = null;
   state.selectedOptions = [];
+  state.pendingVerification = null;
   render();
   closeModal(true);
 }
@@ -685,6 +836,24 @@ function getActiveTile() {
 
 function getTileInputMode(tile) {
   return tile.inputMode || "text";
+}
+
+function usesManualVerification(tile) {
+  return tile.manualVerification === true;
+}
+
+function shuffleArray(items) {
+  const shuffledItems = [...items];
+
+  for (let index = shuffledItems.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffledItems[index], shuffledItems[randomIndex]] = [
+      shuffledItems[randomIndex],
+      shuffledItems[index],
+    ];
+  }
+
+  return shuffledItems;
 }
 
 function buildTileImageStyle(tile) {
@@ -825,6 +994,14 @@ function getVerificationErrorMessage(error) {
   }
 
   return "Verification failed. Try again.";
+}
+
+function getPendingVerificationErrorMessage(error) {
+  if (error instanceof DOMException && error.name === "NotAllowedError") {
+    return "Not verified. Try again later.";
+  }
+
+  return getVerificationErrorMessage(error);
 }
 
 function getStoredValue(key) {

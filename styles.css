@@ -29,10 +29,15 @@ body {
   min-height: 100vh;
   font-family: "Space Grotesk", sans-serif;
   color: var(--ink);
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.35), transparent 24%),
-    radial-gradient(circle at right 20%, rgba(33, 122, 102, 0.12), transparent 28%),
-    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  background-color: #11211e;
+  background-image:
+    linear-gradient(180deg, rgba(10, 19, 17, 0.34) 0%, rgba(10, 19, 17, 0.7) 100%),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 24%),
+    radial-gradient(circle at right 20%, rgba(33, 122, 102, 0.18), transparent 28%),
+    url("images/luxlux.jpg");
+  background-position: center, top left, right 20%, center;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
+  background-size: cover, auto, auto, cover;
 }
 
 body.modal-open {
@@ -355,6 +360,55 @@ input {
   margin: 0.75rem 0 auto;
 }
 
+.review-panel {
+  display: grid;
+  gap: 0.6rem;
+  align-self: stretch;
+  margin: 0.75rem 0 auto;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  background: rgba(255, 250, 244, 0.18);
+  color: #fff9f2;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+.review-panel.is-selection {
+  padding: 0.8rem;
+}
+
+.review-text {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.25;
+  word-break: break-word;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.review-empty {
+  opacity: 0.78;
+}
+
+.review-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.review-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fffaf3;
+  font-size: 0.94rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
 .option-chip {
   min-height: 54px;
   padding: 0.85rem 0.95rem;
@@ -397,7 +451,8 @@ input {
   align-self: stretch;
 }
 
-.answer-form.is-verify-only {
+.answer-form.is-verify-only,
+.answer-form.is-reviewing {
   justify-items: end;
 }
 
@@ -412,7 +467,8 @@ input {
   backdrop-filter: blur(20px);
 }
 
-.answer-form.is-verify-only .answer-bar {
+.answer-form.is-verify-only .answer-bar,
+.answer-form.is-reviewing .answer-bar {
   grid-template-columns: auto;
   padding: 0;
   border: none;
@@ -464,7 +520,8 @@ input {
   color: #f5fffb;
 }
 
-.answer-form.is-verify-only .submit-button {
+.answer-form.is-verify-only .submit-button,
+.answer-form.is-reviewing .submit-button {
   min-width: 118px;
   padding-inline: 1.4rem;
   border-radius: 999px;
@@ -588,6 +645,12 @@ input {
     grid-template-columns: 1fr;
     gap: 0.5rem;
     margin-top: 0.6rem;
+  }
+
+  .review-panel {
+    margin-top: 0.6rem;
+    padding: 0.85rem;
+    border-radius: 22px;
   }
 
   .close-button {

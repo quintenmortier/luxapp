@@ -1,4 +1,4 @@
-const CACHE_NAME = "lux-bingo-v5";
+const CACHE_NAME = "lux-bingo-v9";
 const BASE_URL = new URL("./", self.location.href);
 const INDEX_URL = new URL("./index.html", self.location.href).href;
 const APP_SHELL = [
@@ -7,11 +7,16 @@ const APP_SHELL = [
   new URL("./styles.css", self.location.href).href,
   new URL("./app.js", self.location.href).href,
   new URL("./manifest.webmanifest", self.location.href).href,
+  new URL("./images/arabic.png", self.location.href).href,
+  new URL("./images/goya.jpg", self.location.href).href,
   new URL("./images/icarus.jpg", self.location.href).href,
+  new URL("./images/italian.png", self.location.href).href,
   new URL("./images/latin.png", self.location.href).href,
   new URL("./images/Maria Theresa of Spain.jpeg", self.location.href).href,
   new URL("./images/mandarin.png", self.location.href).href,
+  new URL("./images/monalisa.jpg", self.location.href).href,
   new URL("./images/lux.jpg", self.location.href).href,
+  new URL("./images/luxlux.jpg", self.location.href).href,
   new URL("./images/motomami.jpg", self.location.href).href,
   new URL("./images/venus.jpg", self.location.href).href,
   new URL("./icons/icon-180.png", self.location.href).href,
