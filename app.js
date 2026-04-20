@@ -8,7 +8,9 @@ const IOS_VERIFICATION_PIN_KEY = "lux-bingo.ios-verification-pin";
 const DEFAULT_IOS_VERIFICATION_PIN = "2026";
 const START_INTRO_READ_KEY = "lux-bingo.start-intro-read";
 const START_RACCOON_CLEARED_KEY = "lux-bingo.start-raccoon-cleared";
+const GALLERY_PAINTINGS_KEY = "lux-bingo.gallery-paintings";
 const START_PANEL_STORY = "story";
+const START_PANEL_GALLERY = "gallery";
 const START_PANEL_RACCOON = "raccoon";
 const STORY_BOTTOM_THRESHOLD = 24;
 const RACCOON_TARGET_SCORE = 5;
@@ -23,6 +25,32 @@ const RACCOON_GAME_CONFIG = Object.freeze({
   gapSize: 176,
   obstacleInset: 74,
 });
+const GALLERY_REWARD_POOL = Object.freeze([
+  {
+    id: "venus-de-milo",
+    title: "Venus de Milo",
+    artist: "Alexandros of Antioch",
+    museum: "Louvre Museum, Paris",
+    imageSrc: "images/venus.jpg",
+    imageAlt: "The Venus de Milo sculpture displayed in a frame.",
+  },
+  {
+    id: "mona-lisa",
+    title: "Mona Lisa",
+    artist: "Leonardo da Vinci",
+    museum: "Louvre Museum, Paris",
+    imageSrc: "images/monalisa.jpg",
+    imageAlt: "The Mona Lisa painting displayed in a frame.",
+  },
+  {
+    id: "the-scream",
+    title: "The Scream",
+    artist: "Edvard Munch",
+    museum: "National Museum, Oslo",
+    imageSrc: "images/schreeuw.jpg",
+    imageAlt: "The Scream painting displayed in a frame.",
+  },
+]);
 
 // Replace the label, question, and answers values below with your own box content.
 const tileDefinitions = [
@@ -223,13 +251,19 @@ const tileDefinitions = [
 const lineDefinitions = buildLineDefinitions(boardRows, boardColumns);
 const storedRaccoonCleared = getStoredValue(START_RACCOON_CLEARED_KEY) === "true";
 const storedIntroRead = storedRaccoonCleared || getStoredValue(START_INTRO_READ_KEY) === "true";
+const storedGalleryPaintingIds = reconcileUnlockedPaintings(getStoredPaintingIds(), storedRaccoonCleared);
 
 const state = {
   hasStarted: false,
   introRead: storedIntroRead,
   raccoonCleared: storedRaccoonCleared,
   activeStartPanel: null,
-  raccoonGame: createRaccoonGameState(storedRaccoonCleared ? "won" : "idle"),
+  raccoonGame: createRaccoonGameState("idle"),
+  unlockedPaintingIds: storedGalleryPaintingIds,
+  selectedPaintingId: storedGalleryPaintingIds[storedGalleryPaintingIds.length - 1] || null,
+  latestPaintingRewardId: null,
+  galleryRaccoonMood: "idle",
+  galleryFeedTimer: null,
   tiles: createTiles({ useOpeningLayout: true }),
   score: 0,
   completedLines: new Set(),
@@ -244,6 +278,7 @@ const elements = {
   appShell: document.querySelector("#app-shell"),
   startScreen: document.querySelector("#start-screen"),
   introButton: document.querySelector("#intro-button"),
+  galleryButton: document.querySelector("#gallery-button"),
   raccoonButton: document.querySelector("#raccoon-button"),
   bingoButton: document.querySelector("#bingo-button"),
   startHint: document.querySelector("#start-hint"),
@@ -253,6 +288,13 @@ const elements = {
   storyPanel: document.querySelector("#story-panel"),
   storyScroll: document.querySelector("#story-scroll"),
   storyStatus: document.querySelector("#story-status"),
+  galleryPanel: document.querySelector("#gallery-panel"),
+  galleryWallGrid: document.querySelector("#gallery-wall-grid"),
+  galleryStatus: document.querySelector("#gallery-status"),
+  galleryDetailTitle: document.querySelector("#gallery-detail-title"),
+  galleryDetailArtist: document.querySelector("#gallery-detail-artist"),
+  galleryDetailMuseum: document.querySelector("#gallery-detail-museum"),
+  galleryRaccoonButton: document.querySelector("#gallery-raccoon-button"),
   raccoonPanel: document.querySelector("#raccoon-panel"),
   raccoonCanvas: document.querySelector("#raccoon-canvas"),
   raccoonScore: document.querySelector("#raccoon-score"),
@@ -279,6 +321,8 @@ const elements = {
   resetButton: document.querySelector("#reset-button"),
 };
 
+setStoredPaintingIds(state.unlockedPaintingIds);
+
 render();
 bindEvents();
 
@@ -303,6 +347,7 @@ function createTiles(options = {}) {
 
 function bindEvents() {
   elements.introButton.addEventListener("click", openIntroStory);
+  elements.galleryButton.addEventListener("click", openGallery);
   elements.raccoonButton.addEventListener("click", openRaccoonGame);
   elements.bingoButton.addEventListener("click", startGame);
   elements.startOverlayCloseButton.addEventListener("click", () => closeStartOverlay());
@@ -312,6 +357,8 @@ function bindEvents() {
     }
   });
   elements.storyScroll.addEventListener("scroll", handleStoryScroll);
+  elements.galleryWallGrid.addEventListener("click", handleGalleryWallClick);
+  elements.galleryRaccoonButton.addEventListener("click", feedGalleryRaccoon);
   elements.raccoonStartButton.addEventListener("click", startRaccoonRun);
   elements.raccoonExitButton.addEventListener("click", () => closeStartOverlay());
   elements.raccoonCanvas.addEventListener("pointerdown", handleRaccoonPointerDown);
@@ -356,20 +403,23 @@ function startGame() {
 function renderStartScreen() {
   const overlayOpen = !state.hasStarted && Boolean(state.activeStartPanel);
 
+  elements.galleryButton.disabled = !state.introRead;
   elements.raccoonButton.disabled = !state.introRead;
   elements.bingoButton.disabled = !state.raccoonCleared;
   elements.startHint.textContent = getStartHintText();
 
   elements.startOverlay.hidden = !overlayOpen;
   elements.storyPanel.hidden = state.activeStartPanel !== START_PANEL_STORY;
+  elements.galleryPanel.hidden = state.activeStartPanel !== START_PANEL_GALLERY;
   elements.raccoonPanel.hidden = state.activeStartPanel !== START_PANEL_RACCOON;
-  elements.startOverlayTitle.textContent =
-    state.activeStartPanel === START_PANEL_RACCOON ? "Fat Raccoon Flight" : "Intro Story";
+  elements.startOverlayTitle.textContent = getStartOverlayTitle();
 
   elements.storyStatus.textContent = state.introRead
-    ? "Intro read. Fat Raccoon Flight is unlocked."
+    ? "Intro read. Gallery and Fat Raccoon Flight are unlocked."
     : "Scroll to the bottom to continue.";
 
+  elements.galleryStatus.textContent = getGalleryStatusText();
+  elements.galleryRaccoonButton.classList.toggle("is-fed", state.galleryRaccoonMood === "fed");
   elements.raccoonScore.textContent = `Score ${state.raccoonGame.score}`;
   elements.raccoonTarget.textContent = `Target ${RACCOON_TARGET_SCORE}`;
   elements.raccoonStatus.textContent = getRaccoonStatusText();
@@ -378,21 +428,57 @@ function renderStartScreen() {
 
   document.body.classList.toggle("start-overlay-open", overlayOpen);
 
+  if (overlayOpen && state.activeStartPanel === START_PANEL_GALLERY) {
+    renderGallery();
+  }
+
   if (overlayOpen && state.activeStartPanel === START_PANEL_RACCOON) {
     drawRaccoonGame();
   }
 }
 
+function getStartOverlayTitle() {
+  if (state.activeStartPanel === START_PANEL_GALLERY) {
+    return "Raccoon Gallery";
+  }
+
+  if (state.activeStartPanel === START_PANEL_RACCOON) {
+    return "Fat Raccoon Flight";
+  }
+
+  return "Intro Story";
+}
+
 function getStartHintText() {
   if (!state.introRead) {
-    return "Read the intro story to unlock the raccoon mini-game.";
+    return "Read the intro story to unlock the gallery and raccoon mini-game.";
   }
 
   if (!state.raccoonCleared) {
-    return "Fat Raccoon Flight is unlocked. Reach 5 points to open Lux Bingo.";
+    return "Gallery and Fat Raccoon Flight are unlocked. Reach 5 points to earn a painting and open Lux Bingo.";
   }
 
-  return "All steps unlocked. Replay the raccoon run or head straight into Lux Bingo.";
+  if (state.unlockedPaintingIds.length < GALLERY_REWARD_POOL.length) {
+    return "Lux Bingo is open. Replay Fat Raccoon Flight to hang more paintings in the gallery.";
+  }
+
+  return "Everything is unlocked and the raccoon's living room wall is full.";
+}
+
+function getGalleryStatusText() {
+  if (state.galleryRaccoonMood === "fed") {
+    return "Nom nom. The raccoon did a tiny delighted hop.";
+  }
+
+  if (state.unlockedPaintingIds.length === 0) {
+    return "Beat Fat Raccoon Flight to hang the first artwork.";
+  }
+
+  if (state.unlockedPaintingIds.length < GALLERY_REWARD_POOL.length) {
+    return `Paintings hung: ${state.unlockedPaintingIds.length} / ${GALLERY_REWARD_POOL.length}. Clear another run for the next frame.`;
+  }
+
+  return "All gallery frames are full. The raccoon approves.";
 }
 
 function getRaccoonStatusText() {
@@ -405,11 +491,20 @@ function getRaccoonStatusText() {
   }
 
   if (state.raccoonGame.status === "won") {
+    const earnedPainting = getPaintingById(state.latestPaintingRewardId);
+    if (earnedPainting) {
+      return `Unlocked. You earned ${earnedPainting.title} for the gallery.`;
+    }
+
+    if (state.unlockedPaintingIds.length >= GALLERY_REWARD_POOL.length) {
+      return "Unlocked. Lux Bingo is live and the gallery wall is already full.";
+    }
+
     return "Unlocked. The Lux Bingo button is now live.";
   }
 
   if (state.raccoonCleared) {
-    return "Board unlocked. You can replay the run whenever you want.";
+    return "Board unlocked. Replay the run to earn another gallery piece.";
   }
 
   return "Tap start, then keep the fat raccoon in the air.";
@@ -436,7 +531,9 @@ function openIntroStory() {
     return;
   }
 
+  clearGalleryFeedState();
   state.activeStartPanel = START_PANEL_STORY;
+  stopRaccoonAnimation();
   renderStartScreen();
 
   elements.storyScroll.scrollTop = 0;
@@ -446,15 +543,152 @@ function openIntroStory() {
   });
 }
 
+function openGallery() {
+  if (state.hasStarted || !state.introRead) {
+    return;
+  }
+
+  stopRaccoonAnimation();
+  state.activeStartPanel = START_PANEL_GALLERY;
+  renderStartScreen();
+}
+
 function openRaccoonGame() {
   if (state.hasStarted || !state.introRead) {
     return;
   }
 
   state.activeStartPanel = START_PANEL_RACCOON;
-  resetRaccoonGame(state.raccoonCleared ? "won" : "idle");
+  clearGalleryFeedState();
+  resetRaccoonGame("idle");
   renderStartScreen();
   elements.raccoonCanvas.focus();
+}
+
+function renderGallery() {
+  const activeSelectionId = getActiveGallerySelectionId();
+  const unlockedPaintingIds = new Set(state.unlockedPaintingIds);
+
+  elements.galleryWallGrid.innerHTML = GALLERY_REWARD_POOL.map((painting) => {
+    const isUnlocked = unlockedPaintingIds.has(painting.id);
+    const isActive = activeSelectionId === painting.id;
+    const slotClass = isUnlocked ? "is-unlocked" : "is-empty";
+    const activeClass = isActive ? "is-active" : "";
+    const ariaLabel = isUnlocked
+      ? `View ${painting.title} by ${painting.artist}`
+      : "Empty frame";
+    const surfaceMarkup = isUnlocked
+      ? `
+        <span class="gallery-art-surface">
+          <img src="${painting.imageSrc}" alt="${escapeHtml(painting.imageAlt)}" loading="lazy" decoding="async" />
+        </span>
+      `
+      : '<span class="gallery-art-placeholder">Empty frame</span>';
+    const plaqueTitle = isUnlocked ? painting.title : "Empty frame";
+    const plaqueSubtitle = isUnlocked ? painting.artist : "Win a raccoon run";
+
+    return `
+      <button
+        class="gallery-slot ${slotClass} ${activeClass}"
+        type="button"
+        data-gallery-painting-id="${painting.id}"
+        aria-pressed="${isActive ? "true" : "false"}"
+        aria-label="${escapeHtml(ariaLabel)}"
+      >
+        <span class="gallery-frame">
+          ${surfaceMarkup}
+        </span>
+        <span class="gallery-plaque">
+          <span class="gallery-plaque-title">${escapeHtml(plaqueTitle)}</span>
+          <span class="gallery-plaque-subtitle">${escapeHtml(plaqueSubtitle)}</span>
+        </span>
+      </button>
+    `;
+  }).join("");
+
+  const selectedPainting = getPaintingById(activeSelectionId);
+  if (!selectedPainting || !unlockedPaintingIds.has(activeSelectionId)) {
+    elements.galleryDetailTitle.textContent = "Empty wall";
+    elements.galleryDetailArtist.textContent = "No painting has been earned for this frame yet.";
+    elements.galleryDetailMuseum.textContent =
+      state.unlockedPaintingIds.length === 0
+        ? "Clear the raccoon run to add the first piece to the living room."
+        : "Beat Fat Raccoon Flight again to hang the next work here.";
+    return;
+  }
+
+  elements.galleryDetailTitle.textContent = selectedPainting.title;
+  elements.galleryDetailArtist.textContent = `Artist: ${selectedPainting.artist}`;
+  elements.galleryDetailMuseum.textContent = `Museum: ${selectedPainting.museum}`;
+}
+
+function getActiveGallerySelectionId() {
+  if (state.selectedPaintingId) {
+    return state.selectedPaintingId;
+  }
+
+  return state.unlockedPaintingIds[state.unlockedPaintingIds.length - 1] || GALLERY_REWARD_POOL[0]?.id || null;
+}
+
+function handleGalleryWallClick(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const slotButton = target.closest("[data-gallery-painting-id]");
+  if (!(slotButton instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const paintingId = slotButton.dataset.galleryPaintingId;
+  if (!paintingId) {
+    return;
+  }
+
+  state.selectedPaintingId = paintingId;
+  renderStartScreen();
+}
+
+function feedGalleryRaccoon() {
+  if (state.activeStartPanel !== START_PANEL_GALLERY) {
+    return;
+  }
+
+  clearGalleryFeedState();
+  state.galleryRaccoonMood = "fed";
+  renderStartScreen();
+
+  state.galleryFeedTimer = window.setTimeout(() => {
+    state.galleryFeedTimer = null;
+    state.galleryRaccoonMood = "idle";
+    renderStartScreen();
+  }, 1300);
+}
+
+function clearGalleryFeedState() {
+  clearTimeout(state.galleryFeedTimer);
+  state.galleryFeedTimer = null;
+  state.galleryRaccoonMood = "idle";
+}
+
+function getPaintingById(paintingId) {
+  return GALLERY_REWARD_POOL.find((painting) => painting.id === paintingId) || null;
+}
+
+function awardNextPainting() {
+  const unlockedPaintingIds = new Set(state.unlockedPaintingIds);
+  const nextPainting = GALLERY_REWARD_POOL.find((painting) => !unlockedPaintingIds.has(painting.id)) || null;
+
+  if (!nextPainting) {
+    setStoredPaintingIds(state.unlockedPaintingIds);
+    return null;
+  }
+
+  state.unlockedPaintingIds = [...state.unlockedPaintingIds, nextPainting.id];
+  state.selectedPaintingId = nextPainting.id;
+  setStoredPaintingIds(state.unlockedPaintingIds);
+  return nextPainting;
 }
 
 function closeStartOverlay(force = false) {
@@ -462,6 +696,7 @@ function closeStartOverlay(force = false) {
     return;
   }
 
+  clearGalleryFeedState();
   stopRaccoonAnimation();
   state.activeStartPanel = null;
   renderStartScreen();
@@ -532,6 +767,7 @@ function startRaccoonRun() {
     return;
   }
 
+  state.latestPaintingRewardId = null;
   resetRaccoonGame("running");
   renderStartScreen();
   handleRaccoonInput();
@@ -664,11 +900,13 @@ function crashRaccoonRun() {
 }
 
 function completeRaccoonRun() {
+  const earnedPainting = awardNextPainting();
   stopRaccoonAnimation();
   state.raccoonGame.status = "won";
   state.raccoonGame.score = RACCOON_TARGET_SCORE;
   state.introRead = true;
   state.raccoonCleared = true;
+  state.latestPaintingRewardId = earnedPainting ? earnedPainting.id : null;
   setStoredValue(START_INTRO_READ_KEY, "true");
   setStoredValue(START_RACCOON_CLEARED_KEY, "true");
 }
@@ -1732,6 +1970,54 @@ function getVerificationErrorMessage(error) {
 
 function getIosVerificationPin() {
   return getStoredValue(IOS_VERIFICATION_PIN_KEY) || DEFAULT_IOS_VERIFICATION_PIN;
+}
+
+function getStoredPaintingIds() {
+  const rawValue = getStoredValue(GALLERY_PAINTINGS_KEY);
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue);
+    if (!Array.isArray(parsedValue)) {
+      return [];
+    }
+
+    const validPaintingIds = new Set(GALLERY_REWARD_POOL.map((painting) => painting.id));
+    const normalizedPaintingIds = [];
+
+    parsedValue.forEach((paintingId) => {
+      if (
+        typeof paintingId === "string" &&
+        validPaintingIds.has(paintingId) &&
+        !normalizedPaintingIds.includes(paintingId)
+      ) {
+        normalizedPaintingIds.push(paintingId);
+      }
+    });
+
+    return normalizedPaintingIds;
+  } catch (error) {
+    console.error("Painting storage parse failed:", error);
+    return [];
+  }
+}
+
+function setStoredPaintingIds(paintingIds) {
+  try {
+    window.localStorage.setItem(GALLERY_PAINTINGS_KEY, JSON.stringify(paintingIds));
+  } catch (error) {
+    console.error("Painting storage write failed:", error);
+  }
+}
+
+function reconcileUnlockedPaintings(storedPaintingIds, raccoonCleared) {
+  if (storedPaintingIds.length > 0 || !raccoonCleared) {
+    return storedPaintingIds;
+  }
+
+  return GALLERY_REWARD_POOL[0] ? [GALLERY_REWARD_POOL[0].id] : [];
 }
 
 function getStoredValue(key) {

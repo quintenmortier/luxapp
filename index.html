@@ -28,25 +28,28 @@
       />
       <div class="start-screen-overlay">
         <div class="start-screen-hero">
-          <p class="start-screen-kicker">Three stages</p>
+          <p class="start-screen-kicker">Start hub</p>
           <h1 class="start-screen-title">LUX BINGO</h1>
           <p class="start-screen-subtitle">
-            Read the intro, survive a ridiculous raccoon flight, then unlock the board.
+            Read the intro, visit the raccoon gallery, survive a ridiculous raccoon flight, then unlock the board.
           </p>
         </div>
 
         <div class="start-screen-panel">
           <div class="start-screen-buttons" role="group" aria-label="Start sequence">
             <button id="intro-button" class="start-button" type="button">1. Read intro story</button>
+            <button id="gallery-button" class="start-button" type="button" disabled>
+              2. Gallery
+            </button>
             <button id="raccoon-button" class="start-button" type="button" disabled>
-              2. Fat Raccoon Flight
+              3. Fat Raccoon Flight
             </button>
             <button id="bingo-button" class="start-button" type="button" disabled>
-              3. Enter Lux Bingo
+              4. Enter Lux Bingo
             </button>
           </div>
           <p id="start-hint" class="start-screen-hint" aria-live="polite">
-            Read the intro story to unlock the raccoon mini-game.
+            Read the intro story to unlock the gallery and raccoon mini-game.
           </p>
         </div>
       </div>
@@ -120,17 +123,105 @@
                 posuere, tincidunt elit eget, suscipit erat. Nulla facilisi. Aenean eleifend
                 volutpat lorem, in fermentum velit vulputate at.
               </p>
+              <p>
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sed nisi nec magna
+                porta posuere. Vestibulum feugiat tempor est, at vulputate nunc luctus a. Donec sed
+                nisl a enim faucibus varius vel eu turpis.
+              </p>
+              <p>
+                Suspendisse mollis mauris nec pretium tristique. Sed at congue dui. Integer quis
+                lectus vitae nibh interdum dignissim. Nulla vulputate quam sed sapien iaculis, vel
+                tincidunt justo posuere.
+              </p>
+              <p>
+                Mauris sed leo mollis, pharetra odio a, dignissim neque. Praesent congue lorem
+                mauris, at posuere nisi consequat nec. Vivamus commodo feugiat mi, vel lobortis
+                risus tempor sed. Integer tincidunt feugiat augue.
+              </p>
+              <p>
+                Pellentesque fermentum, dui vitae convallis faucibus, justo tellus suscipit augue,
+                eu congue lorem tortor sed lacus. Ut feugiat arcu elit, ut fermentum turpis
+                ullamcorper non. Integer blandit dui ut sem feugiat bibendum.
+              </p>
+              <p>
+                Nam in aliquam lorem. Morbi sodales convallis sem, a ultrices mi consequat sed.
+                Integer luctus sem vel nibh molestie, non sodales lacus viverra. Donec id metus
+                mollis, accumsan nisi sit amet, tempus nisl.
+              </p>
             </div>
             <p id="story-status" class="start-panel-status" aria-live="polite">
               Scroll to the bottom to continue.
             </p>
           </div>
 
-          <div id="raccoon-panel" class="start-panel" hidden>
+          <div id="gallery-panel" class="start-panel" hidden>
             <p class="start-panel-kicker">Chapter two</p>
+            <h3 class="start-panel-title">Raccoon Gallery</h3>
+            <p class="start-panel-caption">
+              Each successful raccoon flight hangs another work from the bingo game on the wall. Tap the
+              raccoon to feed him a grape.
+            </p>
+
+            <div class="gallery-room">
+              <div class="gallery-wall">
+                <div class="gallery-sconce gallery-sconce-left" aria-hidden="true"></div>
+                <div class="gallery-sconce gallery-sconce-right" aria-hidden="true"></div>
+                <div id="gallery-wall-grid" class="gallery-wall-grid" aria-live="polite"></div>
+              </div>
+
+              <div class="gallery-floor">
+                <div class="gallery-rug" aria-hidden="true"></div>
+
+                <button
+                  id="gallery-raccoon-button"
+                  class="gallery-raccoon-button"
+                  type="button"
+                  aria-label="Feed the raccoon a grape"
+                >
+                  <span class="gallery-grape" aria-hidden="true"></span>
+                  <span class="gallery-hearts" aria-hidden="true">
+                    <span class="gallery-heart gallery-heart-one"></span>
+                    <span class="gallery-heart gallery-heart-two"></span>
+                    <span class="gallery-heart gallery-heart-three"></span>
+                  </span>
+                  <span class="gallery-raccoon-tail" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-body" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-belly" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-head" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-ear gallery-raccoon-ear-left" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-ear gallery-raccoon-ear-right" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-mask" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-eye gallery-raccoon-eye-left" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-eye gallery-raccoon-eye-right" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-snout" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-nose" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-paw gallery-raccoon-paw-left" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-paw gallery-raccoon-paw-right" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-label">Tap to feed a grape</span>
+                </button>
+              </div>
+            </div>
+
+            <p id="gallery-status" class="start-panel-status" aria-live="polite">
+              Beat Fat Raccoon Flight to hang the first artwork.
+            </p>
+
+            <article id="gallery-detail-card" class="gallery-detail-card" aria-live="polite">
+              <p class="gallery-detail-kicker">Selected frame</p>
+              <h4 id="gallery-detail-title" class="gallery-detail-title">Empty wall</h4>
+              <p id="gallery-detail-artist" class="gallery-detail-line">No painting has been earned yet.</p>
+              <p id="gallery-detail-museum" class="gallery-detail-line">
+                Clear the raccoon run to add the first piece to the living room.
+              </p>
+            </article>
+          </div>
+
+          <div id="raccoon-panel" class="start-panel" hidden>
+            <p class="start-panel-kicker">Chapter three</p>
             <h3 class="start-panel-title">Fat Raccoon Flight</h3>
             <p class="start-panel-caption">
-              Click, tap, or press space to flap. Reach 5 points to unlock the bingo board.
+              Click, tap, or press space to flap. Reach 5 points to unlock the bingo board and earn a
+              gallery painting.
             </p>
 
             <div class="raccoon-stage">
