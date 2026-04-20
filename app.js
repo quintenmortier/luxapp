@@ -6,6 +6,23 @@ const BIOMETRIC_CREDENTIAL_KEY = "lux-bingo.biometric-credential-id";
 const BIOMETRIC_USER_ID_KEY = "lux-bingo.biometric-user-id";
 const IOS_VERIFICATION_PIN_KEY = "lux-bingo.ios-verification-pin";
 const DEFAULT_IOS_VERIFICATION_PIN = "2026";
+const START_INTRO_READ_KEY = "lux-bingo.start-intro-read";
+const START_RACCOON_CLEARED_KEY = "lux-bingo.start-raccoon-cleared";
+const START_PANEL_STORY = "story";
+const START_PANEL_RACCOON = "raccoon";
+const STORY_BOTTOM_THRESHOLD = 24;
+const RACCOON_TARGET_SCORE = 5;
+const RACCOON_GAME_CONFIG = Object.freeze({
+  width: 360,
+  height: 640,
+  gravity: 1480,
+  flapVelocity: -460,
+  horizontalSpeed: 180,
+  spawnInterval: 1.5,
+  obstacleWidth: 74,
+  gapSize: 176,
+  obstacleInset: 74,
+});
 
 // Replace the label, question, and answers values below with your own box content.
 const tileDefinitions = [
@@ -204,9 +221,15 @@ const tileDefinitions = [
 ];
 
 const lineDefinitions = buildLineDefinitions(boardRows, boardColumns);
+const storedRaccoonCleared = getStoredValue(START_RACCOON_CLEARED_KEY) === "true";
+const storedIntroRead = storedRaccoonCleared || getStoredValue(START_INTRO_READ_KEY) === "true";
 
 const state = {
   hasStarted: false,
+  introRead: storedIntroRead,
+  raccoonCleared: storedRaccoonCleared,
+  activeStartPanel: null,
+  raccoonGame: createRaccoonGameState(storedRaccoonCleared ? "won" : "idle"),
   tiles: createTiles({ useOpeningLayout: true }),
   score: 0,
   completedLines: new Set(),
@@ -220,7 +243,23 @@ const state = {
 const elements = {
   appShell: document.querySelector("#app-shell"),
   startScreen: document.querySelector("#start-screen"),
-  startButton: document.querySelector("#start-button"),
+  introButton: document.querySelector("#intro-button"),
+  raccoonButton: document.querySelector("#raccoon-button"),
+  bingoButton: document.querySelector("#bingo-button"),
+  startHint: document.querySelector("#start-hint"),
+  startOverlay: document.querySelector("#start-overlay"),
+  startOverlayTitle: document.querySelector("#start-overlay-title"),
+  startOverlayCloseButton: document.querySelector("#start-overlay-close-button"),
+  storyPanel: document.querySelector("#story-panel"),
+  storyScroll: document.querySelector("#story-scroll"),
+  storyStatus: document.querySelector("#story-status"),
+  raccoonPanel: document.querySelector("#raccoon-panel"),
+  raccoonCanvas: document.querySelector("#raccoon-canvas"),
+  raccoonScore: document.querySelector("#raccoon-score"),
+  raccoonTarget: document.querySelector("#raccoon-target"),
+  raccoonStatus: document.querySelector("#raccoon-status"),
+  raccoonStartButton: document.querySelector("#raccoon-start-button"),
+  raccoonExitButton: document.querySelector("#raccoon-exit-button"),
   board: document.querySelector("#bingo-board"),
   scorePill: document.querySelector("#score-pill"),
   scoreValue: document.querySelector("#score-value"),
@@ -263,7 +302,19 @@ function createTiles(options = {}) {
 }
 
 function bindEvents() {
-  elements.startButton.addEventListener("click", startGame);
+  elements.introButton.addEventListener("click", openIntroStory);
+  elements.raccoonButton.addEventListener("click", openRaccoonGame);
+  elements.bingoButton.addEventListener("click", startGame);
+  elements.startOverlayCloseButton.addEventListener("click", () => closeStartOverlay());
+  elements.startOverlay.addEventListener("click", (event) => {
+    if (event.target instanceof HTMLElement && event.target.dataset.closeStartOverlay === "true") {
+      closeStartOverlay();
+    }
+  });
+  elements.storyScroll.addEventListener("scroll", handleStoryScroll);
+  elements.raccoonStartButton.addEventListener("click", startRaccoonRun);
+  elements.raccoonExitButton.addEventListener("click", () => closeStartOverlay());
+  elements.raccoonCanvas.addEventListener("pointerdown", handleRaccoonPointerDown);
   elements.board.addEventListener("click", handleBoardClick);
   elements.optionGrid.addEventListener("click", handleOptionGridClick);
   elements.answerForm.addEventListener("submit", handleAnswerSubmit);
@@ -277,15 +328,12 @@ function bindEvents() {
   elements.scorePill.addEventListener("animationend", () => {
     elements.scorePill.classList.remove("is-bumping");
   });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && elements.modal.classList.contains("is-open")) {
-      closeModal();
-    }
-  });
+  document.addEventListener("keydown", handleDocumentKeyDown);
 }
 
 function render() {
   renderGameVisibility();
+  renderStartScreen();
   renderBoard();
   renderScore();
 }
@@ -296,12 +344,549 @@ function renderGameVisibility() {
 }
 
 function startGame() {
+  if (state.hasStarted || !state.raccoonCleared) {
+    return;
+  }
+
+  closeStartOverlay(true);
+  state.hasStarted = true;
+  render();
+}
+
+function renderStartScreen() {
+  const overlayOpen = !state.hasStarted && Boolean(state.activeStartPanel);
+
+  elements.raccoonButton.disabled = !state.introRead;
+  elements.bingoButton.disabled = !state.raccoonCleared;
+  elements.startHint.textContent = getStartHintText();
+
+  elements.startOverlay.hidden = !overlayOpen;
+  elements.storyPanel.hidden = state.activeStartPanel !== START_PANEL_STORY;
+  elements.raccoonPanel.hidden = state.activeStartPanel !== START_PANEL_RACCOON;
+  elements.startOverlayTitle.textContent =
+    state.activeStartPanel === START_PANEL_RACCOON ? "Fat Raccoon Flight" : "Intro Story";
+
+  elements.storyStatus.textContent = state.introRead
+    ? "Intro read. Fat Raccoon Flight is unlocked."
+    : "Scroll to the bottom to continue.";
+
+  elements.raccoonScore.textContent = `Score ${state.raccoonGame.score}`;
+  elements.raccoonTarget.textContent = `Target ${RACCOON_TARGET_SCORE}`;
+  elements.raccoonStatus.textContent = getRaccoonStatusText();
+  elements.raccoonStartButton.textContent = getRaccoonStartLabel();
+  elements.raccoonStartButton.disabled = state.raccoonGame.status === "running";
+
+  document.body.classList.toggle("start-overlay-open", overlayOpen);
+
+  if (overlayOpen && state.activeStartPanel === START_PANEL_RACCOON) {
+    drawRaccoonGame();
+  }
+}
+
+function getStartHintText() {
+  if (!state.introRead) {
+    return "Read the intro story to unlock the raccoon mini-game.";
+  }
+
+  if (!state.raccoonCleared) {
+    return "Fat Raccoon Flight is unlocked. Reach 5 points to open Lux Bingo.";
+  }
+
+  return "All steps unlocked. Replay the raccoon run or head straight into Lux Bingo.";
+}
+
+function getRaccoonStatusText() {
+  if (state.raccoonGame.status === "running") {
+    return `Flying... ${state.raccoonGame.score} / ${RACCOON_TARGET_SCORE} points.`;
+  }
+
+  if (state.raccoonGame.status === "crashed") {
+    return `Bonk. You reached ${state.raccoonGame.score}. Tap the canvas or retry.`;
+  }
+
+  if (state.raccoonGame.status === "won") {
+    return "Unlocked. The Lux Bingo button is now live.";
+  }
+
+  if (state.raccoonCleared) {
+    return "Board unlocked. You can replay the run whenever you want.";
+  }
+
+  return "Tap start, then keep the fat raccoon in the air.";
+}
+
+function getRaccoonStartLabel() {
+  if (state.raccoonGame.status === "running") {
+    return "Flying...";
+  }
+
+  if (state.raccoonGame.status === "crashed") {
+    return "Retry run";
+  }
+
+  if (state.raccoonCleared) {
+    return "Run again";
+  }
+
+  return "Start run";
+}
+
+function openIntroStory() {
   if (state.hasStarted) {
     return;
   }
 
-  state.hasStarted = true;
-  renderGameVisibility();
+  state.activeStartPanel = START_PANEL_STORY;
+  renderStartScreen();
+
+  elements.storyScroll.scrollTop = 0;
+  elements.storyScroll.focus();
+  window.requestAnimationFrame(() => {
+    handleStoryScroll();
+  });
+}
+
+function openRaccoonGame() {
+  if (state.hasStarted || !state.introRead) {
+    return;
+  }
+
+  state.activeStartPanel = START_PANEL_RACCOON;
+  resetRaccoonGame(state.raccoonCleared ? "won" : "idle");
+  renderStartScreen();
+  elements.raccoonCanvas.focus();
+}
+
+function closeStartOverlay(force = false) {
+  if (!force && state.isSubmitting) {
+    return;
+  }
+
+  stopRaccoonAnimation();
+  state.activeStartPanel = null;
+  renderStartScreen();
+}
+
+function handleStoryScroll() {
+  if (state.activeStartPanel !== START_PANEL_STORY || state.introRead) {
+    return;
+  }
+
+  const scrollDistance =
+    elements.storyScroll.scrollHeight - elements.storyScroll.clientHeight - elements.storyScroll.scrollTop;
+
+  if (scrollDistance <= STORY_BOTTOM_THRESHOLD) {
+    state.introRead = true;
+    setStoredValue(START_INTRO_READ_KEY, "true");
+    renderStartScreen();
+  }
+}
+
+function handleDocumentKeyDown(event) {
+  if (event.key === "Escape") {
+    if (elements.modal.classList.contains("is-open")) {
+      closeModal();
+      return;
+    }
+
+    if (state.activeStartPanel) {
+      closeStartOverlay();
+    }
+    return;
+  }
+
+  const isRaccoonKey = event.code === "Space" || event.key === " " || event.key === "ArrowUp";
+  if (isRaccoonKey && state.activeStartPanel === START_PANEL_RACCOON) {
+    event.preventDefault();
+    handleRaccoonInput();
+  }
+}
+
+function handleRaccoonPointerDown(event) {
+  event.preventDefault();
+
+  if (state.activeStartPanel !== START_PANEL_RACCOON) {
+    return;
+  }
+
+  elements.raccoonCanvas.focus();
+  handleRaccoonInput();
+}
+
+function handleRaccoonInput() {
+  if (state.activeStartPanel !== START_PANEL_RACCOON) {
+    return;
+  }
+
+  if (state.raccoonGame.status !== "running") {
+    startRaccoonRun();
+    return;
+  }
+
+  state.raccoonGame.raccoon.velocityY = RACCOON_GAME_CONFIG.flapVelocity;
+  drawRaccoonGame();
+}
+
+function startRaccoonRun() {
+  if (state.activeStartPanel !== START_PANEL_RACCOON) {
+    return;
+  }
+
+  resetRaccoonGame("running");
+  renderStartScreen();
+  handleRaccoonInput();
+  state.raccoonGame.frameId = window.requestAnimationFrame(stepRaccoonGame);
+}
+
+function createRaccoonGameState(status = "idle") {
+  return {
+    status,
+    frameId: null,
+    lastTimestamp: 0,
+    score: status === "won" ? RACCOON_TARGET_SCORE : 0,
+    raccoon: {
+      x: 116,
+      y: RACCOON_GAME_CONFIG.height / 2,
+      velocityY: 0,
+      radius: 28,
+      rotation: 0,
+    },
+    obstacles: [createRaccoonObstacle(RACCOON_GAME_CONFIG.width + 120)],
+    obstacleTimer: 0,
+  };
+}
+
+function resetRaccoonGame(status = "idle") {
+  stopRaccoonAnimation();
+  state.raccoonGame = createRaccoonGameState(status);
+}
+
+function createRaccoonObstacle(x = RACCOON_GAME_CONFIG.width + 96) {
+  const minimumCenter = RACCOON_GAME_CONFIG.obstacleInset + RACCOON_GAME_CONFIG.gapSize / 2;
+  const maximumCenter =
+    RACCOON_GAME_CONFIG.height - RACCOON_GAME_CONFIG.obstacleInset - RACCOON_GAME_CONFIG.gapSize / 2;
+  const gapCenter = minimumCenter + Math.random() * (maximumCenter - minimumCenter);
+
+  return {
+    x,
+    gapCenter,
+    passed: false,
+  };
+}
+
+function stepRaccoonGame(timestamp) {
+  if (state.raccoonGame.status !== "running") {
+    stopRaccoonAnimation();
+    return;
+  }
+
+  if (!state.raccoonGame.lastTimestamp) {
+    state.raccoonGame.lastTimestamp = timestamp;
+  }
+
+  const deltaSeconds = Math.min((timestamp - state.raccoonGame.lastTimestamp) / 1000, 0.032);
+  state.raccoonGame.lastTimestamp = timestamp;
+
+  updateRaccoonGame(deltaSeconds);
+  drawRaccoonGame();
+
+  if (state.raccoonGame.status === "running") {
+    state.raccoonGame.frameId = window.requestAnimationFrame(stepRaccoonGame);
+  } else {
+    state.raccoonGame.frameId = null;
+    renderStartScreen();
+  }
+}
+
+function updateRaccoonGame(deltaSeconds) {
+  const { raccoon } = state.raccoonGame;
+
+  raccoon.velocityY += RACCOON_GAME_CONFIG.gravity * deltaSeconds;
+  raccoon.y += raccoon.velocityY * deltaSeconds;
+  raccoon.rotation = Math.max(-0.55, Math.min(0.8, raccoon.velocityY / 720));
+
+  state.raccoonGame.obstacleTimer += deltaSeconds;
+  if (state.raccoonGame.obstacleTimer >= RACCOON_GAME_CONFIG.spawnInterval) {
+    state.raccoonGame.obstacleTimer -= RACCOON_GAME_CONFIG.spawnInterval;
+    state.raccoonGame.obstacles.push(createRaccoonObstacle());
+  }
+
+  state.raccoonGame.obstacles.forEach((obstacle) => {
+    obstacle.x -= RACCOON_GAME_CONFIG.horizontalSpeed * deltaSeconds;
+
+    if (!obstacle.passed && obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth < raccoon.x - raccoon.radius) {
+      obstacle.passed = true;
+      state.raccoonGame.score += 1;
+
+      if (state.raccoonGame.score >= RACCOON_TARGET_SCORE) {
+        completeRaccoonRun();
+        return;
+      }
+
+      renderStartScreen();
+    }
+  });
+
+  state.raccoonGame.obstacles = state.raccoonGame.obstacles.filter(
+    (obstacle) => obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth > -80
+  );
+
+  if (
+    raccoon.y - raccoon.radius <= 0 ||
+    raccoon.y + raccoon.radius >= RACCOON_GAME_CONFIG.height ||
+    state.raccoonGame.obstacles.some((obstacle) => doesRaccoonHitObstacle(raccoon, obstacle))
+  ) {
+    crashRaccoonRun();
+  }
+}
+
+function doesRaccoonHitObstacle(raccoon, obstacle) {
+  const gapTop = obstacle.gapCenter - RACCOON_GAME_CONFIG.gapSize / 2;
+  const gapBottom = obstacle.gapCenter + RACCOON_GAME_CONFIG.gapSize / 2;
+  const overlapsHorizontally =
+    raccoon.x + raccoon.radius > obstacle.x &&
+    raccoon.x - raccoon.radius < obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth;
+
+  if (!overlapsHorizontally) {
+    return false;
+  }
+
+  return raccoon.y - raccoon.radius < gapTop || raccoon.y + raccoon.radius > gapBottom;
+}
+
+function crashRaccoonRun() {
+  if (state.raccoonGame.status !== "running") {
+    return;
+  }
+
+  stopRaccoonAnimation();
+  state.raccoonGame.status = "crashed";
+}
+
+function completeRaccoonRun() {
+  stopRaccoonAnimation();
+  state.raccoonGame.status = "won";
+  state.raccoonGame.score = RACCOON_TARGET_SCORE;
+  state.introRead = true;
+  state.raccoonCleared = true;
+  setStoredValue(START_INTRO_READ_KEY, "true");
+  setStoredValue(START_RACCOON_CLEARED_KEY, "true");
+}
+
+function stopRaccoonAnimation() {
+  if (state.raccoonGame.frameId) {
+    window.cancelAnimationFrame(state.raccoonGame.frameId);
+  }
+
+  state.raccoonGame.frameId = null;
+  state.raccoonGame.lastTimestamp = 0;
+}
+
+function drawRaccoonGame() {
+  const context = elements.raccoonCanvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+
+  const { width, height } = elements.raccoonCanvas;
+  const backgroundGradient = context.createLinearGradient(0, 0, 0, height);
+  backgroundGradient.addColorStop(0, "#b8e1d6");
+  backgroundGradient.addColorStop(0.55, "#5a9d8c");
+  backgroundGradient.addColorStop(1, "#173833");
+
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = backgroundGradient;
+  context.fillRect(0, 0, width, height);
+
+  context.fillStyle = "rgba(255, 251, 245, 0.38)";
+  drawCloud(context, 82, 96, 0.95);
+  drawCloud(context, 258, 148, 0.72);
+  drawCloud(context, 204, 78, 0.58);
+
+  context.fillStyle = "rgba(15, 45, 40, 0.24)";
+  context.beginPath();
+  context.arc(82, height + 24, 140, Math.PI, Math.PI * 2);
+  context.arc(278, height + 18, 156, Math.PI, Math.PI * 2);
+  context.fill();
+
+  state.raccoonGame.obstacles.forEach((obstacle) => {
+    drawRaccoonObstacle(context, obstacle, height);
+  });
+
+  drawFatRaccoon(context, state.raccoonGame.raccoon);
+
+  if (state.raccoonGame.status !== "running") {
+    drawRaccoonOverlayMessage(context, width, height);
+  }
+}
+
+function drawCloud(context, x, y, scale) {
+  context.beginPath();
+  context.arc(x, y, 22 * scale, Math.PI, Math.PI * 2);
+  context.arc(x + 24 * scale, y - 8 * scale, 16 * scale, Math.PI, Math.PI * 2);
+  context.arc(x + 46 * scale, y, 20 * scale, Math.PI, Math.PI * 2);
+  context.fill();
+}
+
+function drawRaccoonObstacle(context, obstacle, canvasHeight) {
+  const gapTop = obstacle.gapCenter - RACCOON_GAME_CONFIG.gapSize / 2;
+  const gapBottom = obstacle.gapCenter + RACCOON_GAME_CONFIG.gapSize / 2;
+  const topHeight = gapTop - 18;
+  const bottomY = gapBottom + 18;
+  const bottomHeight = canvasHeight - bottomY;
+
+  context.fillStyle = "#684734";
+  context.fillRect(obstacle.x, 0, RACCOON_GAME_CONFIG.obstacleWidth, topHeight);
+  context.fillRect(obstacle.x, bottomY, RACCOON_GAME_CONFIG.obstacleWidth, bottomHeight);
+
+  context.fillStyle = "#9e6948";
+  context.fillRect(obstacle.x - 6, topHeight - 18, RACCOON_GAME_CONFIG.obstacleWidth + 12, 18);
+  context.fillRect(obstacle.x - 6, gapBottom, RACCOON_GAME_CONFIG.obstacleWidth + 12, 18);
+
+  context.fillStyle = "rgba(255, 219, 185, 0.18)";
+  context.fillRect(obstacle.x + 10, 0, 8, topHeight);
+  context.fillRect(obstacle.x + 10, bottomY, 8, bottomHeight);
+
+  context.fillStyle = "#315f4d";
+  context.beginPath();
+  context.arc(obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth / 2, topHeight - 14, 16, 0, Math.PI * 2);
+  context.arc(obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth / 2, gapBottom + 14, 16, 0, Math.PI * 2);
+  context.fill();
+}
+
+function drawFatRaccoon(context, raccoon) {
+  context.save();
+  context.translate(raccoon.x, raccoon.y);
+  context.rotate(raccoon.rotation);
+
+  context.fillStyle = "#8d837d";
+  context.beginPath();
+  context.ellipse(-34, 8, 28, 16, -0.18, 0, Math.PI * 2);
+  context.fill();
+
+  context.strokeStyle = "#5e5754";
+  context.lineWidth = 4;
+  [-46, -36, -26].forEach((stripeX) => {
+    context.beginPath();
+    context.moveTo(stripeX, -3);
+    context.lineTo(stripeX + 10, 18);
+    context.stroke();
+  });
+
+  context.fillStyle = "#7f7773";
+  context.beginPath();
+  context.ellipse(2, 4, 34, 26, 0.08, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#d4cbc4";
+  context.beginPath();
+  context.ellipse(10, 8, 16, 13, 0.1, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#7f7773";
+  context.beginPath();
+  context.arc(28, -11, 16, 0, Math.PI * 2);
+  context.fill();
+
+  context.beginPath();
+  context.moveTo(16, -18);
+  context.lineTo(20, -34);
+  context.lineTo(31, -18);
+  context.closePath();
+  context.fill();
+
+  context.beginPath();
+  context.moveTo(32, -18);
+  context.lineTo(39, -34);
+  context.lineTo(46, -16);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "#d6b6b4";
+  context.beginPath();
+  context.moveTo(21, -19);
+  context.lineTo(23, -29);
+  context.lineTo(30, -18);
+  context.closePath();
+  context.fill();
+
+  context.beginPath();
+  context.moveTo(35, -18);
+  context.lineTo(39, -29);
+  context.lineTo(43, -17);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "#453d41";
+  context.beginPath();
+  context.ellipse(28, -11, 16, 10, 0, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#ffffff";
+  context.beginPath();
+  context.arc(23, -12, 3.2, 0, Math.PI * 2);
+  context.arc(33, -12, 3.2, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#121212";
+  context.beginPath();
+  context.arc(23, -12, 1.3, 0, Math.PI * 2);
+  context.arc(33, -12, 1.3, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#f6ece2";
+  context.beginPath();
+  context.ellipse(28, -5, 8.5, 6.5, 0, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#2f2626";
+  context.beginPath();
+  context.moveTo(28, -8);
+  context.lineTo(24, -3);
+  context.lineTo(32, -3);
+  context.closePath();
+  context.fill();
+
+  context.restore();
+}
+
+function drawRaccoonOverlayMessage(context, width, height) {
+  let title = "Ready";
+  let subtitle = "Tap or press space to launch.";
+
+  if (state.raccoonGame.status === "crashed") {
+    title = "Bonk";
+    subtitle = "Tap to retry the run.";
+  } else if (state.raccoonGame.status === "won") {
+    title = "Unlocked";
+    subtitle = "Lux Bingo is ready.";
+  }
+
+  drawRoundedRect(context, width / 2 - 124, 42, 248, 78, 22);
+  context.fillStyle = "rgba(8, 20, 18, 0.78)";
+  context.fill();
+
+  context.fillStyle = "#fff8ef";
+  context.textAlign = "center";
+  context.font = '700 28px "Space Grotesk", sans-serif';
+  context.fillText(title, width / 2, 76);
+  context.font = '500 16px "Space Grotesk", sans-serif';
+  context.fillText(subtitle, width / 2, 102);
+}
+
+function drawRoundedRect(context, x, y, width, height, radius) {
+  const clampedRadius = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + clampedRadius, y);
+  context.lineTo(x + width - clampedRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + clampedRadius);
+  context.lineTo(x + width, y + height - clampedRadius);
+  context.quadraticCurveTo(x + width, y + height, x + width - clampedRadius, y + height);
+  context.lineTo(x + clampedRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - clampedRadius);
+  context.lineTo(x, y + clampedRadius);
+  context.quadraticCurveTo(x, y, x + clampedRadius, y);
+  context.closePath();
 }
 
 function renderBoard() {

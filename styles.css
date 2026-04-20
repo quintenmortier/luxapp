@@ -44,6 +44,10 @@ body.modal-open {
   overflow: hidden;
 }
 
+body.start-overlay-open {
+  overflow: hidden;
+}
+
 button,
 input {
   font: inherit;
@@ -98,6 +102,197 @@ input {
   letter-spacing: 0.16em;
   text-align: center;
   text-shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
+}
+
+.start-screen-hero {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+}
+
+.start-screen-kicker,
+.start-panel-kicker {
+  margin: 0;
+  color: rgba(255, 248, 239, 0.86);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.start-screen-subtitle {
+  width: min(100%, 28rem);
+  margin: 0;
+  color: rgba(255, 248, 239, 0.82);
+  font-size: 1rem;
+  line-height: 1.55;
+  text-align: center;
+  text-shadow: 0 12px 34px rgba(0, 0, 0, 0.24);
+}
+
+.start-screen-panel {
+  width: min(100%, 28rem);
+  align-self: center;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 28px;
+  background: rgba(10, 20, 18, 0.42);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.24);
+}
+
+.start-screen-buttons {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.start-screen-hint {
+  min-height: 1.4rem;
+  margin: 0;
+  color: rgba(255, 248, 239, 0.82);
+  font-size: 0.96rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.start-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.start-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 10, 9, 0.32) 0%, rgba(5, 10, 9, 0.7) 100%);
+}
+
+.start-overlay-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 36rem);
+  max-height: min(90vh, 52rem);
+  display: grid;
+  gap: 1rem;
+  padding: 1.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 34px;
+  background:
+    linear-gradient(180deg, rgba(13, 28, 25, 0.98) 0%, rgba(10, 22, 19, 0.98) 100%);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.36);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.start-overlay-close {
+  top: 1rem;
+  right: 1rem;
+}
+
+.start-panel {
+  min-height: 0;
+  display: grid;
+  gap: 0.9rem;
+  padding-top: 1.2rem;
+}
+
+.start-panel-title {
+  margin: 0;
+  color: #fff8ef;
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  line-height: 1;
+}
+
+.start-panel-caption,
+.start-panel-status {
+  margin: 0;
+  color: rgba(255, 248, 239, 0.82);
+  line-height: 1.55;
+}
+
+.story-scroll {
+  min-height: 18rem;
+  max-height: min(52vh, 30rem);
+  padding: 1rem 1rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8efe5;
+  overflow-y: auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
+}
+
+.story-scroll:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.34);
+  outline-offset: 4px;
+}
+
+.story-scroll p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.story-scroll p + p {
+  margin-top: 1rem;
+}
+
+.raccoon-stage {
+  position: relative;
+  display: grid;
+  gap: 0.8rem;
+  justify-items: center;
+}
+
+.raccoon-hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: min(100%, 18rem);
+}
+
+.raccoon-chip {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff8ef;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.raccoon-canvas {
+  width: min(100%, 18rem);
+  height: auto;
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(141, 190, 176, 0.5) 0%, rgba(39, 89, 79, 0.8) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.raccoon-canvas:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.34);
+  outline-offset: 4px;
+}
+
+.raccoon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
 }
 
 .sr-only {
@@ -345,13 +540,28 @@ input {
   transition:
     transform 160ms ease,
     background 160ms ease,
-    box-shadow 160ms ease;
+    box-shadow 160ms ease,
+    opacity 160ms ease;
 }
 
 .start-button:hover {
   transform: translateY(-1px);
   background: #ffffff;
   box-shadow: 0 26px 48px rgba(0, 0, 0, 0.26);
+}
+
+.start-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+  background: rgba(255, 250, 244, 0.62);
+  box-shadow: none;
+}
+
+.start-button-compact {
+  width: auto;
+  min-width: 11rem;
+  padding-inline: 1.5rem;
 }
 
 .modal {
@@ -709,14 +919,66 @@ input {
 }
 
 @media (max-width: 520px) {
+  .start-screen-hero {
+    gap: 0.7rem;
+  }
+
   .start-screen-title {
     font-size: clamp(2rem, 14vw, 3.5rem);
     letter-spacing: 0.12em;
   }
 
+  .start-screen-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .start-screen-panel {
+    width: 100%;
+    padding: 0.85rem;
+    border-radius: 24px;
+  }
+
   .start-button {
     width: 100%;
     min-height: 56px;
+  }
+
+  .start-overlay {
+    padding: 0;
+  }
+
+  .start-overlay-card {
+    width: 100vw;
+    max-height: none;
+    min-height: 100dvh;
+    padding:
+      calc(1rem + env(safe-area-inset-top))
+      max(1rem, env(safe-area-inset-right))
+      calc(1rem + env(safe-area-inset-bottom))
+      max(1rem, env(safe-area-inset-left));
+    border: none;
+    border-radius: 0;
+  }
+
+  .start-panel {
+    padding-top: 2.8rem;
+  }
+
+  .story-scroll {
+    min-height: 15rem;
+    max-height: none;
+  }
+
+  .raccoon-hud {
+    flex-direction: column;
+  }
+
+  .raccoon-chip {
+    text-align: center;
+  }
+
+  .raccoon-canvas {
+    border-radius: 22px;
   }
 
   .app-shell {

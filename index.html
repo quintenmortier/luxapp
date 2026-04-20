@@ -27,8 +27,139 @@
         alt="Luxlux artwork"
       />
       <div class="start-screen-overlay">
-        <h1 class="start-screen-title">LUX BINGO</h1>
-        <button id="start-button" class="start-button" type="button">Start</button>
+        <div class="start-screen-hero">
+          <p class="start-screen-kicker">Three stages</p>
+          <h1 class="start-screen-title">LUX BINGO</h1>
+          <p class="start-screen-subtitle">
+            Read the intro, survive a ridiculous raccoon flight, then unlock the board.
+          </p>
+        </div>
+
+        <div class="start-screen-panel">
+          <div class="start-screen-buttons" role="group" aria-label="Start sequence">
+            <button id="intro-button" class="start-button" type="button">1. Read intro story</button>
+            <button id="raccoon-button" class="start-button" type="button" disabled>
+              2. Fat Raccoon Flight
+            </button>
+            <button id="bingo-button" class="start-button" type="button" disabled>
+              3. Enter Lux Bingo
+            </button>
+          </div>
+          <p id="start-hint" class="start-screen-hint" aria-live="polite">
+            Read the intro story to unlock the raccoon mini-game.
+          </p>
+        </div>
+      </div>
+
+      <div id="start-overlay" class="start-overlay" hidden>
+        <div
+          class="start-overlay-backdrop"
+          data-close-start-overlay="true"
+          aria-hidden="true"
+        ></div>
+        <section
+          class="start-overlay-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="start-overlay-title"
+        >
+          <h2 id="start-overlay-title" class="sr-only">Start sequence</h2>
+          <button
+            class="close-button start-overlay-close"
+            id="start-overlay-close-button"
+            type="button"
+            aria-label="Close"
+          >
+            x
+          </button>
+
+          <div id="story-panel" class="start-panel" hidden>
+            <p class="start-panel-kicker">Chapter one</p>
+            <h3 class="start-panel-title">Intro Story</h3>
+            <p class="start-panel-caption">Scroll all the way down to unlock the next button.</p>
+            <div id="story-scroll" class="story-scroll" tabindex="0">
+              <p>
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non orci sem. Integer
+                gravida vulputate lorem, sed tristique lectus aliquet eu. Morbi eget justo sed
+                massa faucibus feugiat.
+              </p>
+              <p>
+                Curabitur feugiat, erat ut aliquam pretium, lorem nunc ultricies nibh, sed
+                convallis lorem magna vel justo. Quisque luctus blandit eros, at fermentum risus
+                dictum et. Cras facilisis sem nec dui mattis faucibus.
+              </p>
+              <p>
+                Praesent tempus nisi at enim malesuada, ut sagittis leo dignissim. In hendrerit
+                purus id velit egestas, at consequat dui volutpat. Suspendisse finibus semper
+                luctus. Maecenas sit amet fermentum arcu.
+              </p>
+              <p>
+                Vivamus tincidunt dignissim semper. Nullam pulvinar iaculis velit, nec vulputate
+                ligula finibus vel. Pellentesque id sapien id mi faucibus pretium sit amet sit amet
+                arcu. Integer efficitur, sapien sed porttitor ultricies, nibh leo fermentum nibh,
+                nec posuere magna risus eget orci.
+              </p>
+              <p>
+                Fusce tristique dignissim magna, in tincidunt lacus volutpat non. Phasellus eu
+                velit maximus, hendrerit massa in, dictum lorem. Aenean ornare erat id eros
+                vehicula eleifend. Ut faucibus, nibh quis feugiat lacinia, enim erat tempor nibh,
+                eget pharetra lectus erat nec lectus.
+              </p>
+              <p>
+                Donec vitae sem mattis, luctus tortor quis, tincidunt arcu. Aenean vestibulum nisl
+                vel sapien congue, quis tincidunt tellus maximus. Aliquam erat volutpat. Sed
+                finibus luctus sapien, vitae luctus eros tempus vel.
+              </p>
+              <p>
+                Aliquam volutpat libero et purus sollicitudin, eget pulvinar magna sodales. Morbi
+                dictum feugiat lectus, sit amet tincidunt lectus dictum ac. Morbi iaculis purus eu
+                elit vulputate, a faucibus lectus feugiat.
+              </p>
+              <p>
+                Etiam malesuada vehicula lorem, non venenatis nisl condimentum non. Nunc a nibh
+                posuere, tincidunt elit eget, suscipit erat. Nulla facilisi. Aenean eleifend
+                volutpat lorem, in fermentum velit vulputate at.
+              </p>
+            </div>
+            <p id="story-status" class="start-panel-status" aria-live="polite">
+              Scroll to the bottom to continue.
+            </p>
+          </div>
+
+          <div id="raccoon-panel" class="start-panel" hidden>
+            <p class="start-panel-kicker">Chapter two</p>
+            <h3 class="start-panel-title">Fat Raccoon Flight</h3>
+            <p class="start-panel-caption">
+              Click, tap, or press space to flap. Reach 5 points to unlock the bingo board.
+            </p>
+
+            <div class="raccoon-stage">
+              <div class="raccoon-hud">
+                <span id="raccoon-score" class="raccoon-chip">Score 0</span>
+                <span id="raccoon-target" class="raccoon-chip">Target 5</span>
+              </div>
+              <canvas
+                id="raccoon-canvas"
+                class="raccoon-canvas"
+                width="360"
+                height="640"
+                tabindex="0"
+                aria-label="Fat raccoon flying game"
+              ></canvas>
+            </div>
+
+            <div class="raccoon-actions">
+              <button id="raccoon-start-button" class="start-button start-button-compact" type="button">
+                Start run
+              </button>
+              <button id="raccoon-exit-button" class="reset-button" type="button">Back to menu</button>
+            </div>
+
+            <p id="raccoon-status" class="start-panel-status" aria-live="polite">
+              Tap start, then keep the fat raccoon in the air.
+            </p>
+          </div>
+        </section>
       </div>
     </section>
 
