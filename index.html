@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lux Bingo</title>
+    <title>Scippie goes LUX</title>
     <meta name="theme-color" content="#183934" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Lux Bingo" />
+    <meta name="apple-mobile-web-app-title" content="Scippie goes LUX" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/icon-180.png" />
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
@@ -28,29 +28,36 @@
       />
       <div class="start-screen-overlay">
         <div class="start-screen-hero">
-          <p class="start-screen-kicker">Start hub</p>
-          <h1 class="start-screen-title">LUX BINGO</h1>
-          <p class="start-screen-subtitle">
-            Read the intro, visit the raccoon gallery, survive a ridiculous raccoon flight, then unlock the board.
-          </p>
+          <h1 class="start-screen-title">Scippie goes LUX</h1>
+          <div class="start-scippie-shell" aria-hidden="true">
+            <div class="start-scippie">
+              <span class="gallery-raccoon-tail"></span>
+              <span class="gallery-raccoon-body"></span>
+              <span class="gallery-raccoon-belly"></span>
+              <span class="gallery-raccoon-head"></span>
+              <span class="gallery-raccoon-ear gallery-raccoon-ear-left"></span>
+              <span class="gallery-raccoon-ear gallery-raccoon-ear-right"></span>
+              <span class="gallery-raccoon-mask"></span>
+              <span class="gallery-raccoon-eye gallery-raccoon-eye-left"></span>
+              <span class="gallery-raccoon-eye gallery-raccoon-eye-right"></span>
+              <span class="gallery-raccoon-snout"></span>
+              <span class="gallery-raccoon-nose"></span>
+              <span class="gallery-raccoon-paw gallery-raccoon-paw-left"></span>
+              <span class="gallery-raccoon-paw gallery-raccoon-paw-right"></span>
+            </div>
+            <p class="start-scippie-name">Scippie</p>
+          </div>
         </div>
 
         <div class="start-screen-panel">
           <div class="start-screen-buttons" role="group" aria-label="Start sequence">
-            <button id="intro-button" class="start-button" type="button">1. Read intro story</button>
-            <button id="gallery-button" class="start-button" type="button" disabled>
-              2. Gallery
-            </button>
-            <button id="raccoon-button" class="start-button" type="button" disabled>
-              3. Fat Raccoon Flight
-            </button>
+            <button id="intro-button" class="start-button" type="button">Read intro story</button>
+            <button id="gallery-button" class="start-button" type="button" disabled>Gallery</button>
+            <button id="raccoon-button" class="start-button" type="button" disabled>Fat Raccoon Flight</button>
             <button id="bingo-button" class="start-button" type="button" disabled>
-              4. Enter Lux Bingo
+              Enter Scippie goes LUX
             </button>
           </div>
-          <p id="start-hint" class="start-screen-hint" aria-live="polite">
-            Read the intro story to unlock the gallery and raccoon mini-game.
-          </p>
         </div>
       </div>
 

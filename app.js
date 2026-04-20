@@ -281,7 +281,6 @@ const elements = {
   galleryButton: document.querySelector("#gallery-button"),
   raccoonButton: document.querySelector("#raccoon-button"),
   bingoButton: document.querySelector("#bingo-button"),
-  startHint: document.querySelector("#start-hint"),
   startOverlay: document.querySelector("#start-overlay"),
   startOverlayTitle: document.querySelector("#start-overlay-title"),
   startOverlayCloseButton: document.querySelector("#start-overlay-close-button"),
@@ -406,7 +405,6 @@ function renderStartScreen() {
   elements.galleryButton.disabled = !state.introRead;
   elements.raccoonButton.disabled = !state.introRead;
   elements.bingoButton.disabled = !state.raccoonCleared;
-  elements.startHint.textContent = getStartHintText();
 
   elements.startOverlay.hidden = !overlayOpen;
   elements.storyPanel.hidden = state.activeStartPanel !== START_PANEL_STORY;
@@ -449,22 +447,6 @@ function getStartOverlayTitle() {
   return "Intro Story";
 }
 
-function getStartHintText() {
-  if (!state.introRead) {
-    return "Read the intro story to unlock the gallery and raccoon mini-game.";
-  }
-
-  if (!state.raccoonCleared) {
-    return "Gallery and Fat Raccoon Flight are unlocked. Reach 5 points to earn a painting and open Lux Bingo.";
-  }
-
-  if (state.unlockedPaintingIds.length < GALLERY_REWARD_POOL.length) {
-    return "Lux Bingo is open. Replay Fat Raccoon Flight to hang more paintings in the gallery.";
-  }
-
-  return "Everything is unlocked and the raccoon's living room wall is full.";
-}
-
 function getGalleryStatusText() {
   if (state.galleryRaccoonMood === "fed") {
     return "Nom nom. The raccoon did a tiny delighted hop.";
@@ -497,10 +479,10 @@ function getRaccoonStatusText() {
     }
 
     if (state.unlockedPaintingIds.length >= GALLERY_REWARD_POOL.length) {
-      return "Unlocked. Lux Bingo is live and the gallery wall is already full.";
+      return "Unlocked. Scippie goes LUX is live and the gallery wall is already full.";
     }
 
-    return "Unlocked. The Lux Bingo button is now live.";
+    return "Unlocked. The Scippie goes LUX button is now live.";
   }
 
   if (state.raccoonCleared) {
@@ -1097,7 +1079,7 @@ function drawRaccoonOverlayMessage(context, width, height) {
     subtitle = "Tap to retry the run.";
   } else if (state.raccoonGame.status === "won") {
     title = "Unlocked";
-    subtitle = "Lux Bingo is ready.";
+    subtitle = "Scippie goes LUX is ready.";
   }
 
   drawRoundedRect(context, width / 2 - 124, 42, 248, 78, 22);
@@ -1895,11 +1877,11 @@ async function registerBiometricCredential() {
 function buildCredentialOptions() {
   return {
     challenge: randomBytes(32),
-    rp: { name: "Lux Bingo" },
+    rp: { name: "Scippie goes LUX" },
     user: {
       id: getOrCreateBiometricUserId(),
       name: "lux-bingo-player",
-      displayName: "Lux Bingo Player",
+      displayName: "Scippie goes LUX Player",
     },
     pubKeyCredParams: [
       { type: "public-key", alg: -7 },
