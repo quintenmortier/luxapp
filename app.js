@@ -256,6 +256,7 @@ const storedGalleryPaintingIds = reconcileUnlockedPaintings(getStoredPaintingIds
 const state = {
   hasStarted: false,
   introRead: storedIntroRead,
+  storyInteracted: false,
   raccoonCleared: storedRaccoonCleared,
   activeStartPanel: null,
   raccoonGame: createRaccoonGameState("idle"),
@@ -356,6 +357,9 @@ function bindEvents() {
     }
   });
   elements.storyScroll.addEventListener("scroll", handleStoryScroll);
+  elements.storyScroll.addEventListener("pointerdown", handleStoryInteraction);
+  elements.storyScroll.addEventListener("wheel", handleStoryInteraction, { passive: true });
+  elements.storyScroll.addEventListener("keydown", handleStoryInteraction);
   elements.galleryWallGrid.addEventListener("click", handleGalleryWallClick);
   elements.galleryRaccoonButton.addEventListener("click", feedGalleryRaccoon);
   elements.raccoonStartButton.addEventListener("click", startRaccoonRun);
@@ -511,15 +515,13 @@ function openIntroStory() {
   }
 
   clearGalleryFeedState();
+  state.storyInteracted = false;
   state.activeStartPanel = START_PANEL_STORY;
   stopRaccoonAnimation();
   renderStartScreen();
 
   elements.storyScroll.scrollTop = 0;
   elements.storyScroll.focus();
-  window.requestAnimationFrame(() => {
-    handleStoryScroll();
-  });
 }
 
 function openGallery() {
@@ -686,14 +688,45 @@ function handleStoryScroll() {
     return;
   }
 
+  state.storyInteracted = true;
+
+  if (!storyNeedsScrolling()) {
+    unlockIntroStory();
+    return;
+  }
+
   const scrollDistance =
     elements.storyScroll.scrollHeight - elements.storyScroll.clientHeight - elements.storyScroll.scrollTop;
 
   if (scrollDistance <= STORY_BOTTOM_THRESHOLD) {
-    state.introRead = true;
-    setStoredValue(START_INTRO_READ_KEY, "true");
-    renderStartScreen();
+    unlockIntroStory();
   }
+}
+
+function handleStoryInteraction() {
+  if (state.activeStartPanel !== START_PANEL_STORY || state.introRead) {
+    return;
+  }
+
+  state.storyInteracted = true;
+
+  if (!storyNeedsScrolling()) {
+    unlockIntroStory();
+  }
+}
+
+function storyNeedsScrolling() {
+  return elements.storyScroll.scrollHeight - elements.storyScroll.clientHeight > STORY_BOTTOM_THRESHOLD;
+}
+
+function unlockIntroStory() {
+  if (!state.storyInteracted || state.introRead) {
+    return;
+  }
+
+  state.introRead = true;
+  setStoredValue(START_INTRO_READ_KEY, "true");
+  renderStartScreen();
 }
 
 function handleDocumentKeyDown(event) {
