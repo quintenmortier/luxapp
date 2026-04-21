@@ -286,7 +286,6 @@ const elements = {
   startOverlayCloseButton: document.querySelector("#start-overlay-close-button"),
   storyPanel: document.querySelector("#story-panel"),
   storyScroll: document.querySelector("#story-scroll"),
-  storyStatus: document.querySelector("#story-status"),
   galleryPanel: document.querySelector("#gallery-panel"),
   galleryWallGrid: document.querySelector("#gallery-wall-grid"),
   galleryStatus: document.querySelector("#gallery-status"),
@@ -412,10 +411,6 @@ function renderStartScreen() {
   elements.raccoonPanel.hidden = state.activeStartPanel !== START_PANEL_RACCOON;
   elements.startOverlayTitle.textContent = getStartOverlayTitle();
 
-  elements.storyStatus.textContent = state.introRead
-    ? "Intro read. Gallery and Fat Raccoon Flight are unlocked."
-    : "Scroll to the bottom to continue.";
-
   elements.galleryStatus.textContent = getGalleryStatusText();
   elements.galleryRaccoonButton.classList.toggle("is-fed", state.galleryRaccoonMood === "fed");
   elements.raccoonScore.textContent = `Score ${state.raccoonGame.score}`;
@@ -444,7 +439,7 @@ function getStartOverlayTitle() {
     return "Fat Raccoon Flight";
   }
 
-  return "Intro Story";
+  return "Intro";
 }
 
 function getGalleryStatusText() {
