@@ -1,4 +1,4 @@
-const CACHE_NAME = "lux-bingo-v20";
+const CACHE_NAME = "lux-bingo-v21";
 const BASE_URL = new URL("./", self.location.href);
 const INDEX_URL = new URL("./index.html", self.location.href).href;
 const APP_SHELL = [
@@ -37,15 +37,24 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
         keys
           .filter((key) => key !== CACHE_NAME)
           .map((key) => caches.delete(key))
-      )
-    )
+      );
+
+      await self.clients.claim();
+
+      const clients = await self.clients.matchAll({ type: "window" });
+      await Promise.all(
+        clients.map((client) =>
+          "navigate" in client ? client.navigate(client.url) : Promise.resolve()
+        )
+      );
+    })()
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
