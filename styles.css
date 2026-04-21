@@ -170,6 +170,14 @@ input {
   overflow-y: auto;
 }
 
+.start-overlay-card.is-intro-panel {
+  width: min(100%, 70rem);
+  height: min(92vh, 58rem);
+  max-height: min(92vh, 58rem);
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
 .start-overlay-close {
   top: 1rem;
   right: 1rem;
@@ -183,7 +191,9 @@ input {
 }
 
 .start-panel-intro {
+  height: 100%;
   gap: 0.75rem;
+  grid-template-rows: auto minmax(0, 1fr);
   padding-top: 0.65rem;
 }
 
@@ -202,7 +212,8 @@ input {
 }
 
 .story-scroll {
-  height: clamp(14rem, 38vh, 18rem);
+  min-height: 0;
+  height: 100%;
   padding: 1rem 1rem 1.2rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 24px;
@@ -1531,12 +1542,13 @@ input {
     border-radius: 0;
   }
 
-  .start-panel {
-    padding-top: 2.8rem;
+  .start-overlay-card.is-intro-panel {
+    height: 100dvh;
+    max-height: none;
   }
 
-  .story-scroll {
-    height: 14.5rem;
+  .start-panel {
+    padding-top: 2.8rem;
   }
 
   .gallery-wall-grid {

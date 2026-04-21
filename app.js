@@ -282,6 +282,7 @@ const elements = {
   raccoonButton: document.querySelector("#raccoon-button"),
   bingoButton: document.querySelector("#bingo-button"),
   startOverlay: document.querySelector("#start-overlay"),
+  startOverlayCard: document.querySelector("#start-overlay-card"),
   startOverlayTitle: document.querySelector("#start-overlay-title"),
   startOverlayCloseButton: document.querySelector("#start-overlay-close-button"),
   storyPanel: document.querySelector("#story-panel"),
@@ -406,6 +407,7 @@ function renderStartScreen() {
   elements.bingoButton.disabled = !state.raccoonCleared;
 
   elements.startOverlay.hidden = !overlayOpen;
+  elements.startOverlayCard.classList.toggle("is-intro-panel", state.activeStartPanel === START_PANEL_STORY);
   elements.storyPanel.hidden = state.activeStartPanel !== START_PANEL_STORY;
   elements.galleryPanel.hidden = state.activeStartPanel !== START_PANEL_GALLERY;
   elements.raccoonPanel.hidden = state.activeStartPanel !== START_PANEL_RACCOON;
