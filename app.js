@@ -380,6 +380,7 @@ const elements = {
   board: document.querySelector("#bingo-board"),
   scorePill: document.querySelector("#score-pill"),
   scoreValue: document.querySelector("#score-value"),
+  bingoCloseButton: document.querySelector("#bingo-close-button"),
   pointsBurst: document.querySelector("#points-burst"),
   bingoBurst: document.querySelector("#bingo-burst"),
   modal: document.querySelector("#question-modal"),
@@ -444,6 +445,7 @@ function bindEvents() {
   elements.optionGrid.addEventListener("click", handleOptionGridClick);
   elements.answerForm.addEventListener("submit", handleAnswerSubmit);
   elements.resetButton.addEventListener("click", resetGame);
+  elements.bingoCloseButton.addEventListener("click", returnToStartMenu);
   elements.closeModalButton.addEventListener("click", () => closeModal());
   elements.modal.addEventListener("click", (event) => {
     if (event.target instanceof HTMLElement && event.target.dataset.closeModal === "true") {
@@ -475,6 +477,18 @@ function startGame() {
 
   closeStartOverlay(true);
   state.hasStarted = true;
+  render();
+}
+
+function returnToStartMenu() {
+  if (!state.hasStarted || state.isSubmitting) {
+    return;
+  }
+
+  closeModal(true);
+  clearCelebrationBursts();
+  state.activeStartPanel = null;
+  state.hasStarted = false;
   render();
 }
 
@@ -1194,7 +1208,6 @@ function drawRaccoonGame() {
   }
 
   drawFatRaccoon(context, state.raccoonGame.raccoon);
-  drawRaccoonScoreOverlay(context);
   drawRaccoonHealthOverlay(context);
 
   if (state.raccoonGame.status !== "running") {
@@ -1419,26 +1432,6 @@ function drawRaccoonGoal(context, goal) {
     context.fillText("Goal", imageX + imageWidth / 2, imageY + imageHeight / 2);
   }
   context.restore();
-  context.restore();
-}
-
-function drawRaccoonScoreOverlay(context) {
-  const label = `Score ${state.raccoonGame.score}`;
-  context.save();
-  context.font = '700 19px "Space Grotesk", sans-serif';
-  context.textBaseline = "middle";
-  const textWidth = context.measureText(label).width;
-  const pillHeight = 42;
-  const pillWidth = textWidth + 28;
-  const pillX = 18;
-  const pillY = 18;
-
-  drawRoundedRect(context, pillX, pillY, pillWidth, pillHeight, 21);
-  context.fillStyle = "rgba(8, 20, 18, 0.6)";
-  context.fill();
-
-  context.fillStyle = "#fff8ef";
-  context.fillText(label, pillX + 14, pillY + pillHeight / 2 + 1);
   context.restore();
 }
 
