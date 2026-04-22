@@ -1481,16 +1481,20 @@ function drawRaccoonHeart(context, x, y, size, filled) {
 function drawRaccoonOverlayMessage(context, width, height) {
   let title = "Ready";
   let subtitle = "Tap or press space to launch.";
+  let cardWidth = 248;
+  let cardHeight = 78;
 
   if (state.raccoonGame.status === "crashed") {
     title = "Bonk";
     subtitle = "Tap to retry the run.";
   } else if (state.raccoonGame.status === "won") {
-    title = "Unlocked";
-    subtitle = "Scippie goes LUX is ready.";
+    title = "UNLOCKED";
+    subtitle = "Check this out in Scippie's Gallery!";
+    cardWidth = 308;
+    cardHeight = 82;
   }
 
-  drawRoundedRect(context, width / 2 - 124, 42, 248, 78, 22);
+  drawRoundedRect(context, width / 2 - cardWidth / 2, 42, cardWidth, cardHeight, 22);
   context.fillStyle = "rgba(8, 20, 18, 0.78)";
   context.fill();
 
@@ -1498,7 +1502,9 @@ function drawRaccoonOverlayMessage(context, width, height) {
   context.textAlign = "center";
   context.font = '700 28px "Space Grotesk", sans-serif';
   context.fillText(title, width / 2, 76);
-  context.font = '500 16px "Space Grotesk", sans-serif';
+  context.font = state.raccoonGame.status === "won"
+    ? '500 15px "Space Grotesk", sans-serif'
+    : '500 16px "Space Grotesk", sans-serif';
   context.fillText(subtitle, width / 2, 102);
 }
 
