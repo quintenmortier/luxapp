@@ -201,39 +201,31 @@
             </article>
           </div>
 
-          <div id="raccoon-panel" class="start-panel" hidden>
-            <p class="start-panel-kicker">Chapter three</p>
-            <h3 class="start-panel-title">Fat Raccoon Flight</h3>
-            <p class="start-panel-caption">
-              Click, tap, or press space to flap. Reach 5 points to unlock the bingo board and earn a
-              gallery painting.
-            </p>
-
+          <div id="raccoon-panel" class="start-panel start-panel-raccoon" hidden>
             <div class="raccoon-stage">
               <div class="raccoon-hud">
                 <span id="raccoon-score" class="raccoon-chip">Score 0</span>
-                <span id="raccoon-target" class="raccoon-chip">Target 5</span>
+                <div class="raccoon-target-art" aria-live="polite">
+                  <img
+                    id="raccoon-target-image"
+                    class="raccoon-target-image"
+                    src="images/venus.jpg"
+                    alt="Target artwork preview"
+                    decoding="async"
+                  />
+                </div>
               </div>
-              <canvas
-                id="raccoon-canvas"
-                class="raccoon-canvas"
-                width="360"
-                height="640"
-                tabindex="0"
-                aria-label="Fat raccoon flying game"
-              ></canvas>
+              <div class="raccoon-playfield">
+                <canvas
+                  id="raccoon-canvas"
+                  class="raccoon-canvas"
+                  width="360"
+                  height="640"
+                  tabindex="0"
+                  aria-label="Fat raccoon flying game"
+                ></canvas>
+              </div>
             </div>
-
-            <div class="raccoon-actions">
-              <button id="raccoon-start-button" class="start-button start-button-compact" type="button">
-                Start run
-              </button>
-              <button id="raccoon-exit-button" class="reset-button" type="button">Back to menu</button>
-            </div>
-
-            <p id="raccoon-status" class="start-panel-status" aria-live="polite">
-              Tap start, then keep the fat raccoon in the air.
-            </p>
           </div>
         </section>
       </div>
