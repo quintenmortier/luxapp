@@ -17,7 +17,8 @@ const RACCOON_TARGET_SCORE = 5;
 const FINAL_ENTRY_UNLOCK_HOUR = 20;
 const RACCOON_START_HEALTH = 2;
 const RACCOON_MAX_HEALTH = 3;
-const RACCOON_GRAPE_SPAWN_CHANCE = 0.58;
+const RACCOON_MIN_GRAPES_PER_RUN = 1;
+const RACCOON_MAX_GRAPES_PER_RUN = 2;
 const RACCOON_DAMAGE_EXIT_PADDING = 12;
 const RACCOON_BOUNDARY_RECOVERY_INSET = 18;
 const RACCOON_GAME_CONFIG = Object.freeze({
@@ -863,7 +864,7 @@ function startRaccoonRun() {
 }
 
 function createRaccoonGameState(status = "idle") {
-  return {
+  const gameState = {
     status,
     frameId: null,
     lastTimestamp: 0,
@@ -877,10 +878,15 @@ function createRaccoonGameState(status = "idle") {
       radius: 28,
       rotation: 0,
     },
-    obstacles: [createRaccoonObstacle(RACCOON_GAME_CONFIG.width + 120)],
+    grapeSpawnSlots: new Set(buildRaccoonGrapeSpawnSlots()),
+    nextObstacleIndex: 0,
+    obstacles: [],
     obstacleTimer: 0,
     goal: null,
   };
+
+  gameState.obstacles = [createRaccoonObstacle(gameState, RACCOON_GAME_CONFIG.width + 120)];
+  return gameState;
 }
 
 function resetRaccoonGame(status = "idle") {
@@ -888,23 +894,33 @@ function resetRaccoonGame(status = "idle") {
   state.raccoonGame = createRaccoonGameState(status);
 }
 
-function createRaccoonObstacle(x = RACCOON_GAME_CONFIG.width + 96) {
+function createRaccoonObstacle(gameState, x = RACCOON_GAME_CONFIG.width + 96) {
   const minimumCenter = RACCOON_GAME_CONFIG.obstacleInset + RACCOON_GAME_CONFIG.gapSize / 2;
   const maximumCenter =
     RACCOON_GAME_CONFIG.height - RACCOON_GAME_CONFIG.obstacleInset - RACCOON_GAME_CONFIG.gapSize / 2;
   const gapCenter = minimumCenter + Math.random() * (maximumCenter - minimumCenter);
+  const obstacleIndex = gameState.nextObstacleIndex + 1;
+  gameState.nextObstacleIndex = obstacleIndex;
 
   return {
     id: ++raccoonObstacleIdCounter,
     x,
     gapCenter,
     passed: false,
-    grape: createRaccoonGrape(gapCenter),
+    grape: createRaccoonGrape(gameState, gapCenter, obstacleIndex),
   };
 }
 
-function createRaccoonGrape(gapCenter) {
-  if (Math.random() > RACCOON_GRAPE_SPAWN_CHANCE) {
+function buildRaccoonGrapeSpawnSlots() {
+  const grapeCount =
+    RACCOON_MIN_GRAPES_PER_RUN +
+    Math.floor(Math.random() * (RACCOON_MAX_GRAPES_PER_RUN - RACCOON_MIN_GRAPES_PER_RUN + 1));
+
+  return shuffleArray(Array.from({ length: RACCOON_TARGET_SCORE }, (_, index) => index + 1)).slice(0, grapeCount);
+}
+
+function createRaccoonGrape(gameState, gapCenter, obstacleIndex) {
+  if (!gameState.grapeSpawnSlots.has(obstacleIndex)) {
     return null;
   }
 
@@ -955,7 +971,7 @@ function updateRaccoonGame(deltaSeconds) {
     state.raccoonGame.obstacleTimer += deltaSeconds;
     if (state.raccoonGame.obstacleTimer >= RACCOON_GAME_CONFIG.spawnInterval) {
       state.raccoonGame.obstacleTimer -= RACCOON_GAME_CONFIG.spawnInterval;
-      state.raccoonGame.obstacles.push(createRaccoonObstacle());
+      state.raccoonGame.obstacles.push(createRaccoonObstacle(state.raccoonGame));
     }
   }
 
