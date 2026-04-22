@@ -274,7 +274,7 @@ const tileDefinitions = [
       "Mundo Nuevo",
       "Porcelana",
       "Mio Cristo",
-      "Magnolias",
+      "Sexo, Violencia y Llantas",      
       "Reliquia",
       "De Madruga",
     ],
@@ -295,7 +295,7 @@ const tileDefinitions = [
       "Candy",
       "La Fama",
       "Bulerias",
-      "Chicken Teriyaki",
+      "Despecha",
       "Hentai",
       "Bizcochito",
       "Delirio de Grandeza",
@@ -673,12 +673,7 @@ function getRaccoonTargetPainting() {
 
   const unlockedPaintingIds = new Set(state.unlockedPaintingIds);
   const nextPainting = GALLERY_REWARD_POOL.find((painting) => !unlockedPaintingIds.has(painting.id));
-  if (nextPainting) {
-    return nextPainting;
-  }
-
-  const latestUnlockedPaintingId = state.unlockedPaintingIds[state.unlockedPaintingIds.length - 1];
-  return getPaintingById(latestUnlockedPaintingId) || GALLERY_REWARD_POOL[GALLERY_REWARD_POOL.length - 1] || null;
+  return nextPainting || null;
 }
 
 function handleGalleryWallClick(event) {
@@ -1106,6 +1101,7 @@ function createRaccoonGoal(preferredY) {
   const y = Math.max(minY, Math.min(maxY, preferredY - height / 2));
 
   return {
+    rewardType: targetPainting ? "painting" : "grapes",
     paintingId: targetPainting?.id || null,
     x: RACCOON_GAME_CONFIG.width + 150,
     y,
@@ -1336,9 +1332,13 @@ function drawRaccoonGrape(context, obstacle) {
   const x = obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth / 2;
   const y = obstacle.grape.y;
 
+  drawRaccoonGrapeCluster(context, x, y, 1);
+}
+
+function drawRaccoonGrapeCluster(context, x, y, scale = 1) {
   context.save();
   context.shadowColor = "rgba(70, 26, 108, 0.28)";
-  context.shadowBlur = 16;
+  context.shadowBlur = 16 * scale;
   [
     { x: -9, y: -4, r: 6.2 },
     { x: 0, y: -7, r: 6.8 },
@@ -1347,33 +1347,33 @@ function drawRaccoonGrape(context, obstacle) {
     { x: 5, y: 6, r: 6.5 },
   ].forEach((grape) => {
     const gradient = context.createRadialGradient(
-      x + grape.x - 2,
-      y + grape.y - 2,
+      x + (grape.x - 2) * scale,
+      y + (grape.y - 2) * scale,
       1,
-      x + grape.x,
-      y + grape.y,
-      grape.r
+      x + grape.x * scale,
+      y + grape.y * scale,
+      grape.r * scale
     );
     gradient.addColorStop(0, "#b885ee");
     gradient.addColorStop(0.7, "#7b4bb9");
     gradient.addColorStop(1, "#55258b");
     context.fillStyle = gradient;
     context.beginPath();
-    context.arc(x + grape.x, y + grape.y, grape.r, 0, Math.PI * 2);
+    context.arc(x + grape.x * scale, y + grape.y * scale, grape.r * scale, 0, Math.PI * 2);
     context.fill();
   });
   context.shadowBlur = 0;
 
   context.strokeStyle = "#4f8e63";
-  context.lineWidth = 2.2;
+  context.lineWidth = 2.2 * scale;
   context.beginPath();
-  context.moveTo(x, y - 10);
-  context.lineTo(x + 4, y - 18);
+  context.moveTo(x, y - 10 * scale);
+  context.lineTo(x + 4 * scale, y - 18 * scale);
   context.stroke();
 
   context.fillStyle = "#6db071";
   context.beginPath();
-  context.ellipse(x + 10, y - 16, 7, 4, -0.45, 0, Math.PI * 2);
+  context.ellipse(x + 10 * scale, y - 16 * scale, 7 * scale, 4 * scale, -0.45, 0, Math.PI * 2);
   context.fill();
   context.restore();
 }
@@ -1404,6 +1404,10 @@ function drawRaccoonGoal(context, goal) {
   const goalImage = goal.paintingId ? RACCOON_GOAL_IMAGES.get(goal.paintingId) : null;
   if (goalImage && goalImage.complete && goalImage.naturalWidth > 0) {
     context.drawImage(goalImage, imageX, imageY, imageWidth, imageHeight);
+  } else if (goal.rewardType === "grapes") {
+    context.fillStyle = "rgba(16, 25, 23, 0.92)";
+    context.fillRect(imageX, imageY, imageWidth, imageHeight);
+    drawRaccoonGrapeCluster(context, imageX + imageWidth / 2 - 2, imageY + imageHeight / 2 + 6, 2.3);
   } else {
     context.fillStyle = "rgba(16, 25, 23, 0.92)";
     context.fillRect(imageX, imageY, imageWidth, imageHeight);
@@ -1463,10 +1467,17 @@ function drawRaccoonOverlayMessage(context, width, height) {
     title = "Bonk";
     subtitle = "Tap to retry the run.";
   } else if (state.raccoonGame.status === "won") {
-    title = "UNLOCKED";
-    subtitle = "Check this out in Scippie's Gallery!";
-    cardWidth = 308;
-    cardHeight = 82;
+    if (state.latestPaintingRewardId) {
+      title = "UNLOCKED";
+      subtitle = "Check this out in Scippie's Gallery!";
+      cardWidth = 308;
+      cardHeight = 82;
+    } else {
+      title = "GRAPES";
+      subtitle = "Scippie snagged a grape prize.";
+      cardWidth = 278;
+      cardHeight = 82;
+    }
   }
 
   drawRoundedRect(context, width / 2 - cardWidth / 2, 42, cardWidth, cardHeight, 22);

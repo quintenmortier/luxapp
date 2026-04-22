@@ -1,4 +1,4 @@
-const CACHE_NAME = "lux-bingo-v33";
+const CACHE_NAME = "lux-bingo-v34";
 const BASE_URL = new URL("./", self.location.href);
 const INDEX_URL = new URL("./index.html", self.location.href).href;
 const APP_SHELL = [
