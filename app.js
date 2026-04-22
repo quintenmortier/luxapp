@@ -19,7 +19,6 @@ const RACCOON_MAX_HEALTH = 3;
 const RACCOON_GRAPE_SPAWN_CHANCE = 0.58;
 const RACCOON_DAMAGE_EXIT_PADDING = 12;
 const RACCOON_BOUNDARY_RECOVERY_INSET = 18;
-const RACCOON_HOME_X = 116;
 const RACCOON_GAME_CONFIG = Object.freeze({
   width: 360,
   height: 640,
@@ -837,7 +836,7 @@ function createRaccoonGameState(status = "idle") {
     health: RACCOON_START_HEALTH,
     damageRecovery: null,
     raccoon: {
-      x: RACCOON_HOME_X,
+      x: 116,
       y: RACCOON_GAME_CONFIG.height / 2,
       velocityY: 0,
       radius: 28,
@@ -911,11 +910,6 @@ function stepRaccoonGame(timestamp) {
 
 function updateRaccoonGame(deltaSeconds) {
   const { raccoon } = state.raccoonGame;
-  const previousRaccoon = { x: raccoon.x, y: raccoon.y };
-  const recenterSpeed = state.raccoonGame.damageRecovery?.type === "obstacle" ? 2.8 : 6.2;
-  let collidingObstacle = null;
-
-  raccoon.x += (RACCOON_HOME_X - raccoon.x) * Math.min(1, deltaSeconds * recenterSpeed);
 
   raccoon.velocityY += RACCOON_GAME_CONFIG.gravity * deltaSeconds;
   raccoon.y += raccoon.velocityY * deltaSeconds;
@@ -931,17 +925,7 @@ function updateRaccoonGame(deltaSeconds) {
   }
 
   state.raccoonGame.obstacles.forEach((obstacle) => {
-    const previousObstacleX = obstacle.x;
     obstacle.x -= RACCOON_GAME_CONFIG.horizontalSpeed * deltaSeconds;
-
-    if (!state.raccoonGame.damageRecovery && !collidingObstacle) {
-      collidingObstacle = getRaccoonObstacleCollision(
-        raccoon,
-        obstacle,
-        previousRaccoon,
-        previousObstacleX
-      );
-    }
 
     if (obstacle.grape && !obstacle.grape.collected && doesRaccoonCollectGrape(raccoon, obstacle)) {
       obstacle.grape.collected = true;
@@ -979,8 +963,9 @@ function updateRaccoonGame(deltaSeconds) {
   }
 
   if (!state.raccoonGame.damageRecovery) {
+    const collidingObstacle = state.raccoonGame.obstacles.find((obstacle) => doesRaccoonHitObstacle(raccoon, obstacle));
     if (collidingObstacle) {
-      applyRaccoonDamage(collidingObstacle);
+      applyRaccoonDamage({ type: "obstacle", obstacleId: collidingObstacle.id });
       return;
     }
 
@@ -990,7 +975,7 @@ function updateRaccoonGame(deltaSeconds) {
   }
 }
 
-function getRaccoonObstacleCollision(raccoon, obstacle, previousRaccoon, previousObstacleX) {
+function doesRaccoonHitObstacle(raccoon, obstacle) {
   const gapTop = obstacle.gapCenter - RACCOON_GAME_CONFIG.gapSize / 2;
   const gapBottom = obstacle.gapCenter + RACCOON_GAME_CONFIG.gapSize / 2;
   const overlapsHorizontally =
@@ -998,25 +983,10 @@ function getRaccoonObstacleCollision(raccoon, obstacle, previousRaccoon, previou
     raccoon.x - raccoon.radius < obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth;
 
   if (!overlapsHorizontally) {
-    return null;
+    return false;
   }
 
-  const hitsTop = raccoon.y - raccoon.radius < gapTop;
-  const hitsBottom = raccoon.y + raccoon.radius > gapBottom;
-  if (!hitsTop && !hitsBottom) {
-    return null;
-  }
-
-  const previouslyOverlappedHorizontally =
-    previousRaccoon.x + raccoon.radius > previousObstacleX &&
-    previousRaccoon.x - raccoon.radius < previousObstacleX + RACCOON_GAME_CONFIG.obstacleWidth;
-
-  return {
-    type: "obstacle",
-    obstacleId: obstacle.id,
-    impact: previouslyOverlappedHorizontally ? (hitsTop ? "top" : "bottom") : "side",
-    hitRegion: hitsTop ? "top" : "bottom",
-  };
+  return raccoon.y - raccoon.radius < gapTop || raccoon.y + raccoon.radius > gapBottom;
 }
 
 function doesRaccoonCollectGrape(raccoon, obstacle) {
@@ -1067,19 +1037,7 @@ function applyRaccoonDamage(source) {
   if (source.type === "obstacle") {
     const obstacle = state.raccoonGame.obstacles.find((entry) => entry.id === source.obstacleId);
     if (obstacle) {
-      const gapTop = obstacle.gapCenter - RACCOON_GAME_CONFIG.gapSize / 2;
-      const gapBottom = obstacle.gapCenter + RACCOON_GAME_CONFIG.gapSize / 2;
-
-      if (source.impact === "side") {
-        raccoon.x = Math.max(48, Math.min(RACCOON_HOME_X - 14, obstacle.x - raccoon.radius - 10));
-        raccoon.velocityY = source.hitRegion === "top" ? 215 : -215;
-      } else if (source.impact === "top") {
-        raccoon.y = Math.min(raccoon.y, gapTop - raccoon.radius - 2);
-        raccoon.velocityY = Math.max(210, Math.abs(raccoon.velocityY) * 0.44);
-      } else {
-        raccoon.y = Math.max(raccoon.y, gapBottom + raccoon.radius + 2);
-        raccoon.velocityY = -Math.max(210, Math.abs(raccoon.velocityY) * 0.44);
-      }
+      raccoon.velocityY = raccoon.y < obstacle.gapCenter ? 220 : -220;
     }
   } else {
     if (raccoon.y - raccoon.radius <= 0) {
