@@ -51,6 +51,14 @@ const GALLERY_REWARD_POOL = Object.freeze([
     imageAlt: "The Scream painting displayed in a frame.",
   },
 ]);
+const RACCOON_GOAL_IMAGES = new Map(
+  GALLERY_REWARD_POOL.map((painting) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = painting.imageSrc;
+    return [painting.id, image];
+  })
+);
 
 // Replace the label, question, and answers values below with your own box content.
 const tileDefinitions = [
@@ -297,8 +305,6 @@ const elements = {
   galleryRaccoonButton: document.querySelector("#gallery-raccoon-button"),
   raccoonPanel: document.querySelector("#raccoon-panel"),
   raccoonCanvas: document.querySelector("#raccoon-canvas"),
-  raccoonScore: document.querySelector("#raccoon-score"),
-  raccoonTargetImage: document.querySelector("#raccoon-target-image"),
   board: document.querySelector("#bingo-board"),
   scorePill: document.querySelector("#score-pill"),
   scoreValue: document.querySelector("#score-value"),
@@ -406,6 +412,7 @@ function renderStartScreen() {
   elements.bingoButton.disabled = !state.raccoonCleared;
 
   elements.startOverlay.hidden = !overlayOpen;
+  elements.startOverlay.classList.toggle("is-raccoon-panel", state.activeStartPanel === START_PANEL_RACCOON);
   elements.startOverlayCard.classList.toggle("is-intro-panel", state.activeStartPanel === START_PANEL_STORY);
   elements.startOverlayCard.classList.toggle("is-raccoon-panel", state.activeStartPanel === START_PANEL_RACCOON);
   elements.storyPanel.hidden = state.activeStartPanel !== START_PANEL_STORY;
@@ -415,8 +422,6 @@ function renderStartScreen() {
 
   elements.galleryStatus.textContent = getGalleryStatusText();
   elements.galleryRaccoonButton.classList.toggle("is-fed", state.galleryRaccoonMood === "fed");
-  elements.raccoonScore.textContent = `Score ${state.raccoonGame.score}`;
-  renderRaccoonTargetPreview();
 
   document.body.classList.toggle("start-overlay-open", overlayOpen);
 
@@ -455,20 +460,6 @@ function getGalleryStatusText() {
   }
 
   return "All gallery frames are full. The raccoon approves.";
-}
-
-function renderRaccoonTargetPreview() {
-  const targetPainting = getRaccoonTargetPainting();
-  if (!targetPainting) {
-    elements.raccoonTargetImage.removeAttribute("src");
-    elements.raccoonTargetImage.alt = "";
-    elements.raccoonTargetImage.removeAttribute("title");
-    return;
-  }
-
-  elements.raccoonTargetImage.src = targetPainting.imageSrc;
-  elements.raccoonTargetImage.alt = `${targetPainting.title} by ${targetPainting.artist}`;
-  elements.raccoonTargetImage.title = `${targetPainting.title} - ${targetPainting.artist}`;
 }
 
 function openIntroStory() {
@@ -778,6 +769,7 @@ function createRaccoonGameState(status = "idle") {
     },
     obstacles: [createRaccoonObstacle(RACCOON_GAME_CONFIG.width + 120)],
     obstacleTimer: 0,
+    goal: null,
   };
 }
 
@@ -830,10 +822,12 @@ function updateRaccoonGame(deltaSeconds) {
   raccoon.y += raccoon.velocityY * deltaSeconds;
   raccoon.rotation = Math.max(-0.55, Math.min(0.8, raccoon.velocityY / 720));
 
-  state.raccoonGame.obstacleTimer += deltaSeconds;
-  if (state.raccoonGame.obstacleTimer >= RACCOON_GAME_CONFIG.spawnInterval) {
-    state.raccoonGame.obstacleTimer -= RACCOON_GAME_CONFIG.spawnInterval;
-    state.raccoonGame.obstacles.push(createRaccoonObstacle());
+  if (!state.raccoonGame.goal) {
+    state.raccoonGame.obstacleTimer += deltaSeconds;
+    if (state.raccoonGame.obstacleTimer >= RACCOON_GAME_CONFIG.spawnInterval) {
+      state.raccoonGame.obstacleTimer -= RACCOON_GAME_CONFIG.spawnInterval;
+      state.raccoonGame.obstacles.push(createRaccoonObstacle());
+    }
   }
 
   state.raccoonGame.obstacles.forEach((obstacle) => {
@@ -841,20 +835,33 @@ function updateRaccoonGame(deltaSeconds) {
 
     if (!obstacle.passed && obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth < raccoon.x - raccoon.radius) {
       obstacle.passed = true;
-      state.raccoonGame.score += 1;
+      if (!state.raccoonGame.goal) {
+        state.raccoonGame.score += 1;
 
-      if (state.raccoonGame.score >= RACCOON_TARGET_SCORE) {
-        completeRaccoonRun();
-        return;
+        if (state.raccoonGame.score >= RACCOON_TARGET_SCORE) {
+          state.raccoonGame.goal = createRaccoonGoal(raccoon.y);
+        }
       }
-
-      renderStartScreen();
     }
   });
 
   state.raccoonGame.obstacles = state.raccoonGame.obstacles.filter(
     (obstacle) => obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth > -80
   );
+
+  if (state.raccoonGame.goal) {
+    state.raccoonGame.goal.x -= RACCOON_GAME_CONFIG.horizontalSpeed * deltaSeconds;
+
+    if (doesRaccoonReachGoal(raccoon, state.raccoonGame.goal)) {
+      completeRaccoonRun();
+      return;
+    }
+
+    if (state.raccoonGame.goal.x + state.raccoonGame.goal.width < raccoon.x - raccoon.radius) {
+      crashRaccoonRun();
+      return;
+    }
+  }
 
   if (
     raccoon.y - raccoon.radius <= 0 ||
@@ -877,6 +884,32 @@ function doesRaccoonHitObstacle(raccoon, obstacle) {
   }
 
   return raccoon.y - raccoon.radius < gapTop || raccoon.y + raccoon.radius > gapBottom;
+}
+
+function createRaccoonGoal(preferredY) {
+  const targetPainting = getRaccoonTargetPainting();
+  const width = 94;
+  const height = 118;
+  const minY = 72;
+  const maxY = RACCOON_GAME_CONFIG.height - height - 72;
+  const y = Math.max(minY, Math.min(maxY, preferredY - height / 2));
+
+  return {
+    paintingId: targetPainting?.id || null,
+    x: RACCOON_GAME_CONFIG.width + 150,
+    y,
+    width,
+    height,
+  };
+}
+
+function doesRaccoonReachGoal(raccoon, goal) {
+  const closestX = Math.max(goal.x, Math.min(raccoon.x, goal.x + goal.width));
+  const closestY = Math.max(goal.y, Math.min(raccoon.y, goal.y + goal.height));
+  const deltaX = raccoon.x - closestX;
+  const deltaY = raccoon.y - closestY;
+
+  return deltaX * deltaX + deltaY * deltaY <= raccoon.radius * raccoon.radius;
 }
 
 function crashRaccoonRun() {
@@ -940,7 +973,12 @@ function drawRaccoonGame() {
     drawRaccoonObstacle(context, obstacle, height);
   });
 
+  if (state.raccoonGame.goal) {
+    drawRaccoonGoal(context, state.raccoonGame.goal);
+  }
+
   drawFatRaccoon(context, state.raccoonGame.raccoon);
+  drawRaccoonScoreOverlay(context);
 
   if (state.raccoonGame.status !== "running") {
     drawRaccoonOverlayMessage(context, width, height);
@@ -1074,6 +1112,65 @@ function drawFatRaccoon(context, raccoon) {
   context.closePath();
   context.fill();
 
+  context.restore();
+}
+
+function drawRaccoonGoal(context, goal) {
+  context.save();
+  context.shadowColor = "rgba(255, 224, 173, 0.42)";
+  context.shadowBlur = 24;
+  context.fillStyle = "#6a452f";
+  drawRoundedRect(context, goal.x, goal.y, goal.width, goal.height, 20);
+  context.fill();
+  context.shadowBlur = 0;
+
+  context.fillStyle = "#a87549";
+  drawRoundedRect(context, goal.x + 5, goal.y + 5, goal.width - 10, goal.height - 10, 16);
+  context.fill();
+
+  const imageInset = 12;
+  const imageX = goal.x + imageInset;
+  const imageY = goal.y + imageInset;
+  const imageWidth = goal.width - imageInset * 2;
+  const imageHeight = goal.height - imageInset * 2;
+
+  context.save();
+  drawRoundedRect(context, imageX, imageY, imageWidth, imageHeight, 12);
+  context.clip();
+
+  const goalImage = goal.paintingId ? RACCOON_GOAL_IMAGES.get(goal.paintingId) : null;
+  if (goalImage && goalImage.complete && goalImage.naturalWidth > 0) {
+    context.drawImage(goalImage, imageX, imageY, imageWidth, imageHeight);
+  } else {
+    context.fillStyle = "rgba(16, 25, 23, 0.92)";
+    context.fillRect(imageX, imageY, imageWidth, imageHeight);
+    context.fillStyle = "rgba(255, 245, 232, 0.76)";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.font = '700 14px "Space Grotesk", sans-serif';
+    context.fillText("Goal", imageX + imageWidth / 2, imageY + imageHeight / 2);
+  }
+  context.restore();
+  context.restore();
+}
+
+function drawRaccoonScoreOverlay(context) {
+  const label = `Score ${state.raccoonGame.score}`;
+  context.save();
+  context.font = '700 19px "Space Grotesk", sans-serif';
+  context.textBaseline = "middle";
+  const textWidth = context.measureText(label).width;
+  const pillHeight = 42;
+  const pillWidth = textWidth + 28;
+  const pillX = 18;
+  const pillY = 18;
+
+  drawRoundedRect(context, pillX, pillY, pillWidth, pillHeight, 21);
+  context.fillStyle = "rgba(8, 20, 18, 0.6)";
+  context.fill();
+
+  context.fillStyle = "#fff8ef";
+  context.fillText(label, pillX + 14, pillY + pillHeight / 2 + 1);
   context.restore();
 }
 
