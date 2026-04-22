@@ -14,6 +14,11 @@ const START_PANEL_GALLERY = "gallery";
 const START_PANEL_RACCOON = "raccoon";
 const STORY_BOTTOM_THRESHOLD = 24;
 const RACCOON_TARGET_SCORE = 5;
+const RACCOON_START_HEALTH = 2;
+const RACCOON_MAX_HEALTH = 3;
+const RACCOON_GRAPE_SPAWN_CHANCE = 0.58;
+const RACCOON_DAMAGE_EXIT_PADDING = 12;
+const RACCOON_BOUNDARY_RECOVERY_INSET = 18;
 const RACCOON_GAME_CONFIG = Object.freeze({
   width: 360,
   height: 640,
@@ -59,6 +64,7 @@ const RACCOON_GOAL_IMAGES = new Map(
     return [painting.id, image];
   })
 );
+let raccoonObstacleIdCounter = 0;
 
 // Replace the label, question, and answers values below with your own box content.
 const tileDefinitions = [
@@ -760,6 +766,8 @@ function createRaccoonGameState(status = "idle") {
     frameId: null,
     lastTimestamp: 0,
     score: status === "won" ? RACCOON_TARGET_SCORE : 0,
+    health: RACCOON_START_HEALTH,
+    damageRecovery: null,
     raccoon: {
       x: 116,
       y: RACCOON_GAME_CONFIG.height / 2,
@@ -785,9 +793,27 @@ function createRaccoonObstacle(x = RACCOON_GAME_CONFIG.width + 96) {
   const gapCenter = minimumCenter + Math.random() * (maximumCenter - minimumCenter);
 
   return {
+    id: ++raccoonObstacleIdCounter,
     x,
     gapCenter,
     passed: false,
+    grape: createRaccoonGrape(gapCenter),
+  };
+}
+
+function createRaccoonGrape(gapCenter) {
+  if (Math.random() > RACCOON_GRAPE_SPAWN_CHANCE) {
+    return null;
+  }
+
+  const safeInset = 38;
+  const maxOffset = Math.max(0, RACCOON_GAME_CONFIG.gapSize / 2 - safeInset);
+  const yOffset = (Math.random() * 2 - 1) * maxOffset;
+
+  return {
+    y: gapCenter + yOffset,
+    radius: 13,
+    collected: false,
   };
 }
 
@@ -821,6 +847,7 @@ function updateRaccoonGame(deltaSeconds) {
   raccoon.velocityY += RACCOON_GAME_CONFIG.gravity * deltaSeconds;
   raccoon.y += raccoon.velocityY * deltaSeconds;
   raccoon.rotation = Math.max(-0.55, Math.min(0.8, raccoon.velocityY / 720));
+  updateRaccoonDamageRecovery();
 
   if (!state.raccoonGame.goal) {
     state.raccoonGame.obstacleTimer += deltaSeconds;
@@ -832,6 +859,11 @@ function updateRaccoonGame(deltaSeconds) {
 
   state.raccoonGame.obstacles.forEach((obstacle) => {
     obstacle.x -= RACCOON_GAME_CONFIG.horizontalSpeed * deltaSeconds;
+
+    if (obstacle.grape && !obstacle.grape.collected && doesRaccoonCollectGrape(raccoon, obstacle)) {
+      obstacle.grape.collected = true;
+      state.raccoonGame.health = Math.min(RACCOON_MAX_HEALTH, state.raccoonGame.health + 1);
+    }
 
     if (!obstacle.passed && obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth < raccoon.x - raccoon.radius) {
       obstacle.passed = true;
@@ -863,12 +895,16 @@ function updateRaccoonGame(deltaSeconds) {
     }
   }
 
-  if (
-    raccoon.y - raccoon.radius <= 0 ||
-    raccoon.y + raccoon.radius >= RACCOON_GAME_CONFIG.height ||
-    state.raccoonGame.obstacles.some((obstacle) => doesRaccoonHitObstacle(raccoon, obstacle))
-  ) {
-    crashRaccoonRun();
+  if (!state.raccoonGame.damageRecovery) {
+    const collidingObstacle = state.raccoonGame.obstacles.find((obstacle) => doesRaccoonHitObstacle(raccoon, obstacle));
+    if (collidingObstacle) {
+      applyRaccoonDamage({ type: "obstacle", obstacleId: collidingObstacle.id });
+      return;
+    }
+
+    if (raccoon.y - raccoon.radius <= 0 || raccoon.y + raccoon.radius >= RACCOON_GAME_CONFIG.height) {
+      applyRaccoonDamage({ type: "boundary" });
+    }
   }
 }
 
@@ -884,6 +920,74 @@ function doesRaccoonHitObstacle(raccoon, obstacle) {
   }
 
   return raccoon.y - raccoon.radius < gapTop || raccoon.y + raccoon.radius > gapBottom;
+}
+
+function doesRaccoonCollectGrape(raccoon, obstacle) {
+  if (!obstacle.grape || obstacle.grape.collected) {
+    return false;
+  }
+
+  const grapeX = obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth / 2;
+  const grapeY = obstacle.grape.y;
+  const deltaX = raccoon.x - grapeX;
+  const deltaY = raccoon.y - grapeY;
+  const pickupDistance = raccoon.radius + obstacle.grape.radius + 4;
+
+  return deltaX * deltaX + deltaY * deltaY <= pickupDistance * pickupDistance;
+}
+
+function updateRaccoonDamageRecovery() {
+  const recovery = state.raccoonGame.damageRecovery;
+  if (!recovery) {
+    return;
+  }
+
+  if (recovery.type === "obstacle") {
+    const obstacle = state.raccoonGame.obstacles.find((entry) => entry.id === recovery.obstacleId);
+    if (
+      !obstacle ||
+      obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth <
+        state.raccoonGame.raccoon.x - state.raccoonGame.raccoon.radius - RACCOON_DAMAGE_EXIT_PADDING
+    ) {
+      state.raccoonGame.damageRecovery = null;
+    }
+    return;
+  }
+
+  if (
+    state.raccoonGame.raccoon.y - state.raccoonGame.raccoon.radius > RACCOON_BOUNDARY_RECOVERY_INSET &&
+    state.raccoonGame.raccoon.y + state.raccoonGame.raccoon.radius <
+      RACCOON_GAME_CONFIG.height - RACCOON_BOUNDARY_RECOVERY_INSET
+  ) {
+    state.raccoonGame.damageRecovery = null;
+  }
+}
+
+function applyRaccoonDamage(source) {
+  const { raccoon } = state.raccoonGame;
+  state.raccoonGame.health -= 1;
+
+  if (source.type === "obstacle") {
+    const obstacle = state.raccoonGame.obstacles.find((entry) => entry.id === source.obstacleId);
+    if (obstacle) {
+      raccoon.velocityY = raccoon.y < obstacle.gapCenter ? 220 : -220;
+    }
+  } else {
+    if (raccoon.y - raccoon.radius <= 0) {
+      raccoon.y = raccoon.radius + 2;
+      raccoon.velocityY = Math.max(180, Math.abs(raccoon.velocityY) * 0.45);
+    } else {
+      raccoon.y = RACCOON_GAME_CONFIG.height - raccoon.radius - 2;
+      raccoon.velocityY = -Math.max(220, Math.abs(raccoon.velocityY) * 0.5);
+    }
+  }
+
+  if (state.raccoonGame.health <= 0) {
+    crashRaccoonRun();
+    return;
+  }
+
+  state.raccoonGame.damageRecovery = source;
 }
 
 function createRaccoonGoal(preferredY) {
@@ -971,6 +1075,7 @@ function drawRaccoonGame() {
 
   state.raccoonGame.obstacles.forEach((obstacle) => {
     drawRaccoonObstacle(context, obstacle, height);
+    drawRaccoonGrape(context, obstacle);
   });
 
   if (state.raccoonGame.goal) {
@@ -979,6 +1084,7 @@ function drawRaccoonGame() {
 
   drawFatRaccoon(context, state.raccoonGame.raccoon);
   drawRaccoonScoreOverlay(context);
+  drawRaccoonHealthOverlay(context);
 
   if (state.raccoonGame.status !== "running") {
     drawRaccoonOverlayMessage(context, width, height);
@@ -1023,6 +1129,7 @@ function drawFatRaccoon(context, raccoon) {
   context.save();
   context.translate(raccoon.x, raccoon.y);
   context.rotate(raccoon.rotation);
+  context.globalAlpha = state.raccoonGame.damageRecovery ? 0.72 : 1;
 
   context.fillStyle = "#8d837d";
   context.beginPath();
@@ -1115,6 +1222,56 @@ function drawFatRaccoon(context, raccoon) {
   context.restore();
 }
 
+function drawRaccoonGrape(context, obstacle) {
+  if (!obstacle.grape || obstacle.grape.collected) {
+    return;
+  }
+
+  const x = obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth / 2;
+  const y = obstacle.grape.y;
+
+  context.save();
+  context.shadowColor = "rgba(70, 26, 108, 0.28)";
+  context.shadowBlur = 16;
+  [
+    { x: -9, y: -4, r: 6.2 },
+    { x: 0, y: -7, r: 6.8 },
+    { x: 9, y: -4, r: 6.2 },
+    { x: -5, y: 6, r: 6.5 },
+    { x: 5, y: 6, r: 6.5 },
+  ].forEach((grape) => {
+    const gradient = context.createRadialGradient(
+      x + grape.x - 2,
+      y + grape.y - 2,
+      1,
+      x + grape.x,
+      y + grape.y,
+      grape.r
+    );
+    gradient.addColorStop(0, "#b885ee");
+    gradient.addColorStop(0.7, "#7b4bb9");
+    gradient.addColorStop(1, "#55258b");
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(x + grape.x, y + grape.y, grape.r, 0, Math.PI * 2);
+    context.fill();
+  });
+  context.shadowBlur = 0;
+
+  context.strokeStyle = "#4f8e63";
+  context.lineWidth = 2.2;
+  context.beginPath();
+  context.moveTo(x, y - 10);
+  context.lineTo(x + 4, y - 18);
+  context.stroke();
+
+  context.fillStyle = "#6db071";
+  context.beginPath();
+  context.ellipse(x + 10, y - 16, 7, 4, -0.45, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+}
+
 function drawRaccoonGoal(context, goal) {
   context.save();
   context.shadowColor = "rgba(255, 224, 173, 0.42)";
@@ -1171,6 +1328,42 @@ function drawRaccoonScoreOverlay(context) {
 
   context.fillStyle = "#fff8ef";
   context.fillText(label, pillX + 14, pillY + pillHeight / 2 + 1);
+  context.restore();
+}
+
+function drawRaccoonHealthOverlay(context) {
+  const heartSize = 22;
+  const heartGap = 9;
+  const heartsWidth = RACCOON_MAX_HEALTH * heartSize + (RACCOON_MAX_HEALTH - 1) * heartGap;
+  const startX = context.canvas.width - heartsWidth - 80;
+  const y = 38;
+
+  context.save();
+  for (let index = 0; index < RACCOON_MAX_HEALTH; index += 1) {
+    drawRaccoonHeart(context, startX + index * (heartSize + heartGap), y, heartSize, index < state.raccoonGame.health);
+  }
+  context.restore();
+}
+
+function drawRaccoonHeart(context, x, y, size, filled) {
+  const radius = size * 0.28;
+  const bottomY = y + size * 0.72;
+
+  context.save();
+  context.beginPath();
+  context.moveTo(x, y + size * 0.28);
+  context.bezierCurveTo(x, y, x + size * 0.08, y - radius, x + size * 0.26, y - radius);
+  context.bezierCurveTo(x + size * 0.44, y - radius, x + size * 0.5, y + size * 0.06, x + size * 0.5, y + size * 0.18);
+  context.bezierCurveTo(x + size * 0.5, y + size * 0.06, x + size * 0.56, y - radius, x + size * 0.74, y - radius);
+  context.bezierCurveTo(x + size * 0.92, y - radius, x + size, y, x + size, y + size * 0.28);
+  context.lineTo(x + size * 0.5, bottomY);
+  context.closePath();
+
+  context.fillStyle = filled ? "#ff8aa5" : "rgba(255, 248, 239, 0.18)";
+  context.fill();
+  context.lineWidth = 2;
+  context.strokeStyle = filled ? "rgba(255, 241, 245, 0.95)" : "rgba(255, 248, 239, 0.42)";
+  context.stroke();
   context.restore();
 }
 
