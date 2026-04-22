@@ -14,6 +14,7 @@ const START_PANEL_GALLERY = "gallery";
 const START_PANEL_RACCOON = "raccoon";
 const STORY_BOTTOM_THRESHOLD = 24;
 const RACCOON_TARGET_SCORE = 5;
+const FINAL_ENTRY_UNLOCK_HOUR = 20;
 const RACCOON_START_HEALTH = 2;
 const RACCOON_MAX_HEALTH = 3;
 const RACCOON_GRAPE_SPAWN_CHANCE = 0.58;
@@ -124,6 +125,7 @@ const RACCOON_GOAL_IMAGES = new Map(
   })
 );
 let raccoonObstacleIdCounter = 0;
+let finalEntryAvailabilityTimer = 0;
 
 // Replace the label, question, and answers values below with your own box content.
 const tileDefinitions = [
@@ -322,9 +324,10 @@ const tileDefinitions = [
 ];
 
 const lineDefinitions = buildLineDefinitions(boardRows, boardColumns);
-const storedRaccoonCleared = getStoredValue(START_RACCOON_CLEARED_KEY) === "true";
+const storedRaccoonClearedFlag = getStoredValue(START_RACCOON_CLEARED_KEY) === "true";
+const storedGalleryPaintingIds = reconcileUnlockedPaintings(getStoredPaintingIds(), storedRaccoonClearedFlag);
+const storedRaccoonCleared = storedRaccoonClearedFlag || storedGalleryPaintingIds.length > 0;
 const storedIntroRead = storedRaccoonCleared || getStoredValue(START_INTRO_READ_KEY) === "true";
-const storedGalleryPaintingIds = reconcileUnlockedPaintings(getStoredPaintingIds(), storedRaccoonCleared);
 
 const state = {
   hasStarted: false,
@@ -466,7 +469,7 @@ function renderGameVisibility() {
 }
 
 function startGame() {
-  if (state.hasStarted || !state.raccoonCleared) {
+  if (state.hasStarted || !isMainGameUnlocked()) {
     return;
   }
 
@@ -477,10 +480,11 @@ function startGame() {
 
 function renderStartScreen() {
   const overlayOpen = !state.hasStarted && Boolean(state.activeStartPanel);
+  const galleryUnlocked = hasUnlockedGallery();
 
-  elements.galleryButton.disabled = !state.introRead;
+  elements.galleryButton.disabled = !galleryUnlocked;
   elements.raccoonButton.disabled = !state.introRead;
-  elements.bingoButton.disabled = !state.raccoonCleared;
+  elements.bingoButton.disabled = !isMainGameUnlocked();
 
   elements.startOverlay.hidden = !overlayOpen;
   elements.startOverlay.classList.toggle("is-raccoon-panel", state.activeStartPanel === START_PANEL_RACCOON);
@@ -504,18 +508,58 @@ function renderStartScreen() {
   if (overlayOpen && state.activeStartPanel === START_PANEL_RACCOON) {
     drawRaccoonGame();
   }
+
+  scheduleFinalEntryAvailabilityRefresh();
 }
 
 function getStartOverlayTitle() {
   if (state.activeStartPanel === START_PANEL_GALLERY) {
-    return "Raccoon Gallery";
+    return "Scippie's Gallery";
   }
 
   if (state.activeStartPanel === START_PANEL_RACCOON) {
-    return "Fat Raccoon Flight";
+    return "Art/grape hunt";
   }
 
   return "Intro";
+}
+
+function hasUnlockedGallery() {
+  return state.unlockedPaintingIds.length > 0;
+}
+
+function isAfterFinalEntryHour(now = new Date()) {
+  return now.getHours() >= FINAL_ENTRY_UNLOCK_HOUR;
+}
+
+function isMainGameUnlocked(now = new Date()) {
+  return hasUnlockedGallery() && isAfterFinalEntryHour(now);
+}
+
+function getNextFinalEntryAvailabilityTransition(now = new Date()) {
+  const nextTransition = new Date(now);
+
+  if (isAfterFinalEntryHour(now)) {
+    nextTransition.setDate(nextTransition.getDate() + 1);
+    nextTransition.setHours(0, 0, 0, 0);
+    return nextTransition;
+  }
+
+  nextTransition.setHours(FINAL_ENTRY_UNLOCK_HOUR, 0, 0, 0);
+  return nextTransition;
+}
+
+function scheduleFinalEntryAvailabilityRefresh() {
+  window.clearTimeout(finalEntryAvailabilityTimer);
+
+  const now = new Date();
+  const nextTransition = getNextFinalEntryAvailabilityTransition(now);
+  const delay = Math.max(250, nextTransition.getTime() - now.getTime() + 250);
+
+  finalEntryAvailabilityTimer = window.setTimeout(() => {
+    finalEntryAvailabilityTimer = 0;
+    renderStartScreen();
+  }, delay);
 }
 
 function openIntroStory() {
@@ -534,7 +578,7 @@ function openIntroStory() {
 }
 
 function openGallery() {
-  if (state.hasStarted || !state.introRead) {
+  if (state.hasStarted || !hasUnlockedGallery()) {
     return;
   }
 
@@ -1098,7 +1142,7 @@ function completeRaccoonRun() {
   state.raccoonGame.status = "won";
   state.raccoonGame.score = RACCOON_TARGET_SCORE;
   state.introRead = true;
-  state.raccoonCleared = true;
+  state.raccoonCleared = state.unlockedPaintingIds.length > 0;
   state.latestPaintingRewardId = earnedPainting ? earnedPainting.id : null;
   setStoredValue(START_INTRO_READ_KEY, "true");
   setStoredValue(START_RACCOON_CLEARED_KEY, "true");
