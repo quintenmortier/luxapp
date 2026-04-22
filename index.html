@@ -139,23 +139,24 @@
             </div>
           </div>
 
-          <div id="gallery-panel" class="start-panel" hidden>
-            <p class="start-panel-kicker">Chapter two</p>
-            <h3 class="start-panel-title">Raccoon Gallery</h3>
-            <p class="start-panel-caption">
-              Each successful raccoon flight hangs another work from the bingo game on the wall. Tap the
-              raccoon to feed him a grape.
-            </p>
-
+          <div id="gallery-panel" class="start-panel start-panel-gallery" hidden>
             <div class="gallery-room">
               <div class="gallery-wall">
                 <div class="gallery-sconce gallery-sconce-left" aria-hidden="true"></div>
                 <div class="gallery-sconce gallery-sconce-right" aria-hidden="true"></div>
+                <div class="gallery-poster-tape gallery-poster-tape-left" aria-hidden="true"></div>
+                <div class="gallery-poster-tape gallery-poster-tape-right" aria-hidden="true"></div>
                 <div id="gallery-wall-grid" class="gallery-wall-grid" aria-live="polite"></div>
               </div>
 
               <div class="gallery-floor">
                 <div class="gallery-rug" aria-hidden="true"></div>
+                <div class="gallery-bed" aria-hidden="true">
+                  <span class="gallery-bed-blanket"></span>
+                  <span class="gallery-bed-pillow gallery-bed-pillow-left"></span>
+                  <span class="gallery-bed-pillow gallery-bed-pillow-right"></span>
+                </div>
+                <div class="gallery-nightstand" aria-hidden="true"></div>
 
                 <button
                   id="gallery-raccoon-button"
@@ -178,27 +179,48 @@
                   <span class="gallery-raccoon-mask" aria-hidden="true"></span>
                   <span class="gallery-raccoon-eye gallery-raccoon-eye-left" aria-hidden="true"></span>
                   <span class="gallery-raccoon-eye gallery-raccoon-eye-right" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-cheek gallery-raccoon-cheek-left" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-cheek gallery-raccoon-cheek-right" aria-hidden="true"></span>
                   <span class="gallery-raccoon-snout" aria-hidden="true"></span>
                   <span class="gallery-raccoon-nose" aria-hidden="true"></span>
+                  <span class="gallery-raccoon-smile" aria-hidden="true"></span>
                   <span class="gallery-raccoon-paw gallery-raccoon-paw-left" aria-hidden="true"></span>
                   <span class="gallery-raccoon-paw gallery-raccoon-paw-right" aria-hidden="true"></span>
-                  <span class="gallery-raccoon-label">Tap to feed a grape</span>
                 </button>
               </div>
             </div>
 
-            <p id="gallery-status" class="start-panel-status" aria-live="polite">
-              Beat Fat Raccoon Flight to hang the first artwork.
-            </p>
-
-            <article id="gallery-detail-card" class="gallery-detail-card" aria-live="polite">
-              <p class="gallery-detail-kicker">Selected frame</p>
-              <h4 id="gallery-detail-title" class="gallery-detail-title">Empty wall</h4>
-              <p id="gallery-detail-artist" class="gallery-detail-line">No painting has been earned yet.</p>
-              <p id="gallery-detail-museum" class="gallery-detail-line">
-                Clear the raccoon run to add the first piece to the living room.
-              </p>
-            </article>
+            <div id="gallery-art-modal" class="gallery-art-modal" hidden>
+              <button
+                class="gallery-art-modal-backdrop"
+                id="gallery-art-modal-backdrop"
+                type="button"
+                aria-label="Close artwork details"
+              ></button>
+              <article
+                class="gallery-art-modal-card"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="gallery-art-modal-title"
+              >
+                <button
+                  class="close-button gallery-art-modal-close"
+                  id="gallery-art-modal-close-button"
+                  type="button"
+                  aria-label="Close artwork details"
+                >
+                  x
+                </button>
+                <div class="gallery-art-modal-frame">
+                  <img id="gallery-art-modal-image" class="gallery-art-modal-image" alt="" />
+                </div>
+                <div class="gallery-art-modal-copy">
+                  <h4 id="gallery-art-modal-title" class="gallery-art-modal-title">Artwork</h4>
+                  <p id="gallery-art-modal-artist" class="gallery-art-modal-line"></p>
+                  <p id="gallery-art-modal-note" class="gallery-art-modal-line"></p>
+                </div>
+              </article>
+            </div>
           </div>
 
           <div id="raccoon-panel" class="start-panel start-panel-raccoon" hidden>

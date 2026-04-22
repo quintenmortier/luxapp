@@ -19,6 +19,7 @@ const RACCOON_MAX_HEALTH = 3;
 const RACCOON_GRAPE_SPAWN_CHANCE = 0.58;
 const RACCOON_DAMAGE_EXIT_PADDING = 12;
 const RACCOON_BOUNDARY_RECOVERY_INSET = 18;
+const RACCOON_HOME_X = 116;
 const RACCOON_GAME_CONFIG = Object.freeze({
   width: 360,
   height: 640,
@@ -35,26 +36,85 @@ const GALLERY_REWARD_POOL = Object.freeze([
     id: "venus-de-milo",
     title: "Venus de Milo",
     artist: "Alexandros of Antioch",
-    museum: "Louvre Museum, Paris",
+    note: "Soft museum postcard light above Scippie's bed.",
     imageSrc: "images/venus.jpg",
     imageAlt: "The Venus de Milo sculpture displayed in a frame.",
+  },
+  {
+    id: "icarus",
+    title: "Icarus",
+    artist: "Myth print",
+    note: "Pinned near the desk lamp where Scippie studies late.",
+    imageSrc: "images/icarus.jpg",
+    imageAlt: "A dramatic artwork showing a mythological scene.",
+  },
+  {
+    id: "maria-teresa",
+    title: "Maria Teresa of Spain",
+    artist: "Diego Velazquez",
+    note: "A formal portrait Scippie hung extra straight on the wall.",
+    imageSrc: "images/Maria Theresa of Spain.jpeg",
+    imageAlt: "A formal portrait painting of a royal woman.",
+  },
+  {
+    id: "goya-work",
+    title: "Goya Work",
+    artist: "Francisco Goya",
+    note: "One of the darker prints in the room's quiet corner.",
+    imageSrc: "images/goya.jpg",
+    imageAlt: "A painting associated with Goya.",
   },
   {
     id: "mona-lisa",
     title: "Mona Lisa",
     artist: "Leonardo da Vinci",
-    museum: "Louvre Museum, Paris",
+    note: "A tiny classic staring over Scippie's nightstand.",
     imageSrc: "images/monalisa.jpg",
     imageAlt: "The Mona Lisa painting displayed in a frame.",
+  },
+  {
+    id: "degas-work",
+    title: "Degas Work",
+    artist: "Edgar Degas",
+    note: "Hung low enough for Scippie to admire while lounging.",
+    imageSrc: "images/degas.jpg",
+    imageAlt: "An artwork associated with Degas.",
   },
   {
     id: "the-scream",
     title: "The Scream",
     artist: "Edvard Munch",
-    museum: "National Museum, Oslo",
+    note: "Tilted just a little, which somehow makes it perfect.",
     imageSrc: "images/schreeuw.jpg",
     imageAlt: "The Scream painting displayed in a frame.",
   },
+  {
+    id: "lux-poster",
+    title: "LUX",
+    artist: "Album artwork",
+    note: "A glossy poster glowing in the warm bedroom light.",
+    imageSrc: "images/lux.jpg",
+    imageAlt: "The album cover for LUX.",
+  },
+  {
+    id: "motomami-poster",
+    title: "MOTOMAMI",
+    artist: "Album artwork",
+    note: "Pinned by hand with a little more attitude than the rest.",
+    imageSrc: "images/motomami.jpg",
+    imageAlt: "The album cover for MOTOMAMI.",
+  },
+]);
+const GALLERY_WALL_LAYOUT = Object.freeze([
+  { left: 7, top: 10, width: 15, rotate: -4, ratio: "4 / 5" },
+  { left: 25, top: 8, width: 19, rotate: 3, ratio: "6 / 5" },
+  { left: 48, top: 10, width: 14, rotate: -2, ratio: "4 / 5" },
+  { left: 65, top: 6, width: 14, rotate: 4, ratio: "4 / 5" },
+  { left: 81, top: 12, width: 12, rotate: 2, ratio: "4 / 5" },
+  { left: 14, top: 43, width: 15, rotate: 2, ratio: "4 / 5" },
+  { left: 33, top: 40, width: 14, rotate: -3, ratio: "4 / 5" },
+  { left: 52, top: 44, width: 15, rotate: 4, ratio: "1 / 1" },
+  { left: 72, top: 47, width: 15, rotate: -5, ratio: "1 / 1" },
 ]);
 const RACCOON_GOAL_IMAGES = new Map(
   GALLERY_REWARD_POOL.map((painting) => {
@@ -276,6 +336,7 @@ const state = {
   raccoonGame: createRaccoonGameState("idle"),
   unlockedPaintingIds: storedGalleryPaintingIds,
   selectedPaintingId: storedGalleryPaintingIds[storedGalleryPaintingIds.length - 1] || null,
+  galleryModalPaintingId: null,
   latestPaintingRewardId: null,
   galleryRaccoonMood: "idle",
   galleryFeedTimer: null,
@@ -304,10 +365,13 @@ const elements = {
   storyScroll: document.querySelector("#story-scroll"),
   galleryPanel: document.querySelector("#gallery-panel"),
   galleryWallGrid: document.querySelector("#gallery-wall-grid"),
-  galleryStatus: document.querySelector("#gallery-status"),
-  galleryDetailTitle: document.querySelector("#gallery-detail-title"),
-  galleryDetailArtist: document.querySelector("#gallery-detail-artist"),
-  galleryDetailMuseum: document.querySelector("#gallery-detail-museum"),
+  galleryArtModal: document.querySelector("#gallery-art-modal"),
+  galleryArtModalBackdrop: document.querySelector("#gallery-art-modal-backdrop"),
+  galleryArtModalCloseButton: document.querySelector("#gallery-art-modal-close-button"),
+  galleryArtModalImage: document.querySelector("#gallery-art-modal-image"),
+  galleryArtModalTitle: document.querySelector("#gallery-art-modal-title"),
+  galleryArtModalArtist: document.querySelector("#gallery-art-modal-artist"),
+  galleryArtModalNote: document.querySelector("#gallery-art-modal-note"),
   galleryRaccoonButton: document.querySelector("#gallery-raccoon-button"),
   raccoonPanel: document.querySelector("#raccoon-panel"),
   raccoonCanvas: document.querySelector("#raccoon-canvas"),
@@ -370,6 +434,8 @@ function bindEvents() {
   elements.storyScroll.addEventListener("wheel", handleStoryInteraction, { passive: true });
   elements.storyScroll.addEventListener("keydown", handleStoryInteraction);
   elements.galleryWallGrid.addEventListener("click", handleGalleryWallClick);
+  elements.galleryArtModalBackdrop.addEventListener("click", closeGalleryArtModal);
+  elements.galleryArtModalCloseButton.addEventListener("click", closeGalleryArtModal);
   elements.galleryRaccoonButton.addEventListener("click", feedGalleryRaccoon);
   elements.raccoonCanvas.addEventListener("pointerdown", handleRaccoonPointerDown);
   elements.board.addEventListener("click", handleBoardClick);
@@ -420,19 +486,20 @@ function renderStartScreen() {
   elements.startOverlay.hidden = !overlayOpen;
   elements.startOverlay.classList.toggle("is-raccoon-panel", state.activeStartPanel === START_PANEL_RACCOON);
   elements.startOverlayCard.classList.toggle("is-intro-panel", state.activeStartPanel === START_PANEL_STORY);
+  elements.startOverlayCard.classList.toggle("is-gallery-panel", state.activeStartPanel === START_PANEL_GALLERY);
   elements.startOverlayCard.classList.toggle("is-raccoon-panel", state.activeStartPanel === START_PANEL_RACCOON);
   elements.storyPanel.hidden = state.activeStartPanel !== START_PANEL_STORY;
   elements.galleryPanel.hidden = state.activeStartPanel !== START_PANEL_GALLERY;
   elements.raccoonPanel.hidden = state.activeStartPanel !== START_PANEL_RACCOON;
   elements.startOverlayTitle.textContent = getStartOverlayTitle();
 
-  elements.galleryStatus.textContent = getGalleryStatusText();
   elements.galleryRaccoonButton.classList.toggle("is-fed", state.galleryRaccoonMood === "fed");
 
   document.body.classList.toggle("start-overlay-open", overlayOpen);
 
   if (overlayOpen && state.activeStartPanel === START_PANEL_GALLERY) {
     renderGallery();
+    renderGalleryArtModal();
   }
 
   if (overlayOpen && state.activeStartPanel === START_PANEL_RACCOON) {
@@ -450,22 +517,6 @@ function getStartOverlayTitle() {
   }
 
   return "Intro";
-}
-
-function getGalleryStatusText() {
-  if (state.galleryRaccoonMood === "fed") {
-    return "Nom nom. The raccoon did a tiny delighted hop.";
-  }
-
-  if (state.unlockedPaintingIds.length === 0) {
-    return "Beat Fat Raccoon Flight to hang the first artwork.";
-  }
-
-  if (state.unlockedPaintingIds.length < GALLERY_REWARD_POOL.length) {
-    return `Paintings hung: ${state.unlockedPaintingIds.length} / ${GALLERY_REWARD_POOL.length}. Clear another run for the next frame.`;
-  }
-
-  return "All gallery frames are full. The raccoon approves.";
 }
 
 function openIntroStory() {
@@ -506,14 +557,12 @@ function openRaccoonGame() {
 }
 
 function renderGallery() {
-  const activeSelectionId = getActiveGallerySelectionId();
   const unlockedPaintingIds = new Set(state.unlockedPaintingIds);
 
-  elements.galleryWallGrid.innerHTML = GALLERY_REWARD_POOL.map((painting) => {
+  elements.galleryWallGrid.innerHTML = GALLERY_REWARD_POOL.map((painting, index) => {
     const isUnlocked = unlockedPaintingIds.has(painting.id);
-    const isActive = activeSelectionId === painting.id;
     const slotClass = isUnlocked ? "is-unlocked" : "is-empty";
-    const activeClass = isActive ? "is-active" : "";
+    const layout = GALLERY_WALL_LAYOUT[index] || GALLERY_WALL_LAYOUT[GALLERY_WALL_LAYOUT.length - 1];
     const ariaLabel = isUnlocked
       ? `View ${painting.title} by ${painting.artist}`
       : "Empty frame";
@@ -523,51 +572,59 @@ function renderGallery() {
           <img src="${painting.imageSrc}" alt="${escapeHtml(painting.imageAlt)}" loading="lazy" decoding="async" />
         </span>
       `
-      : '<span class="gallery-art-placeholder">Empty frame</span>';
-    const plaqueTitle = isUnlocked ? painting.title : "Empty frame";
-    const plaqueSubtitle = isUnlocked ? painting.artist : "Win a raccoon run";
+      : '<span class="gallery-art-placeholder" aria-hidden="true"></span>';
 
     return `
       <button
-        class="gallery-slot ${slotClass} ${activeClass}"
+        class="gallery-slot ${slotClass}"
         type="button"
         data-gallery-painting-id="${painting.id}"
-        aria-pressed="${isActive ? "true" : "false"}"
         aria-label="${escapeHtml(ariaLabel)}"
+        style="${escapeHtml(buildGallerySlotStyle(layout))}"
+        ${isUnlocked ? "" : "disabled"}
       >
         <span class="gallery-frame">
           ${surfaceMarkup}
         </span>
-        <span class="gallery-plaque">
-          <span class="gallery-plaque-title">${escapeHtml(plaqueTitle)}</span>
-          <span class="gallery-plaque-subtitle">${escapeHtml(plaqueSubtitle)}</span>
-        </span>
       </button>
     `;
   }).join("");
+}
 
-  const selectedPainting = getPaintingById(activeSelectionId);
-  if (!selectedPainting || !unlockedPaintingIds.has(activeSelectionId)) {
-    elements.galleryDetailTitle.textContent = "Empty wall";
-    elements.galleryDetailArtist.textContent = "No painting has been earned for this frame yet.";
-    elements.galleryDetailMuseum.textContent =
-      state.unlockedPaintingIds.length === 0
-        ? "Clear the raccoon run to add the first piece to the living room."
-        : "Beat Fat Raccoon Flight again to hang the next work here.";
+function renderGalleryArtModal() {
+  const painting = getPaintingById(state.galleryModalPaintingId);
+  const isUnlocked = Boolean(painting && state.unlockedPaintingIds.includes(painting.id));
+
+  elements.galleryArtModal.hidden = !isUnlocked;
+
+  if (!painting || !isUnlocked) {
     return;
   }
 
-  elements.galleryDetailTitle.textContent = selectedPainting.title;
-  elements.galleryDetailArtist.textContent = `Artist: ${selectedPainting.artist}`;
-  elements.galleryDetailMuseum.textContent = `Museum: ${selectedPainting.museum}`;
+  elements.galleryArtModalImage.src = painting.imageSrc;
+  elements.galleryArtModalImage.alt = painting.imageAlt;
+  elements.galleryArtModalTitle.textContent = painting.title;
+  elements.galleryArtModalArtist.textContent = painting.artist;
+  elements.galleryArtModalNote.textContent = painting.note;
 }
 
-function getActiveGallerySelectionId() {
-  if (state.selectedPaintingId) {
-    return state.selectedPaintingId;
+function closeGalleryArtModal() {
+  if (state.galleryModalPaintingId === null) {
+    return;
   }
 
-  return state.unlockedPaintingIds[state.unlockedPaintingIds.length - 1] || GALLERY_REWARD_POOL[0]?.id || null;
+  state.galleryModalPaintingId = null;
+  renderStartScreen();
+}
+
+function buildGallerySlotStyle(layout) {
+  return [
+    `--gallery-slot-left: ${layout.left}%`,
+    `--gallery-slot-top: ${layout.top}%`,
+    `--gallery-slot-width: ${layout.width}%`,
+    `--gallery-slot-rotate: ${layout.rotate}deg`,
+    `--gallery-slot-ratio: ${layout.ratio}`,
+  ].join("; ");
 }
 
 function getRaccoonTargetPainting() {
@@ -601,7 +658,12 @@ function handleGalleryWallClick(event) {
     return;
   }
 
+  if (!state.unlockedPaintingIds.includes(paintingId)) {
+    return;
+  }
+
   state.selectedPaintingId = paintingId;
+  state.galleryModalPaintingId = paintingId;
   renderStartScreen();
 }
 
@@ -652,6 +714,7 @@ function closeStartOverlay(force = false) {
   }
 
   clearGalleryFeedState();
+  state.galleryModalPaintingId = null;
   stopRaccoonAnimation();
   state.activeStartPanel = null;
   renderStartScreen();
@@ -705,6 +768,11 @@ function unlockIntroStory() {
 
 function handleDocumentKeyDown(event) {
   if (event.key === "Escape") {
+    if (!elements.galleryArtModal.hidden) {
+      closeGalleryArtModal();
+      return;
+    }
+
     if (elements.modal.classList.contains("is-open")) {
       closeModal();
       return;
@@ -769,7 +837,7 @@ function createRaccoonGameState(status = "idle") {
     health: RACCOON_START_HEALTH,
     damageRecovery: null,
     raccoon: {
-      x: 116,
+      x: RACCOON_HOME_X,
       y: RACCOON_GAME_CONFIG.height / 2,
       velocityY: 0,
       radius: 28,
@@ -843,6 +911,11 @@ function stepRaccoonGame(timestamp) {
 
 function updateRaccoonGame(deltaSeconds) {
   const { raccoon } = state.raccoonGame;
+  const previousRaccoon = { x: raccoon.x, y: raccoon.y };
+  const recenterSpeed = state.raccoonGame.damageRecovery?.type === "obstacle" ? 2.8 : 6.2;
+  let collidingObstacle = null;
+
+  raccoon.x += (RACCOON_HOME_X - raccoon.x) * Math.min(1, deltaSeconds * recenterSpeed);
 
   raccoon.velocityY += RACCOON_GAME_CONFIG.gravity * deltaSeconds;
   raccoon.y += raccoon.velocityY * deltaSeconds;
@@ -858,7 +931,17 @@ function updateRaccoonGame(deltaSeconds) {
   }
 
   state.raccoonGame.obstacles.forEach((obstacle) => {
+    const previousObstacleX = obstacle.x;
     obstacle.x -= RACCOON_GAME_CONFIG.horizontalSpeed * deltaSeconds;
+
+    if (!state.raccoonGame.damageRecovery && !collidingObstacle) {
+      collidingObstacle = getRaccoonObstacleCollision(
+        raccoon,
+        obstacle,
+        previousRaccoon,
+        previousObstacleX
+      );
+    }
 
     if (obstacle.grape && !obstacle.grape.collected && doesRaccoonCollectGrape(raccoon, obstacle)) {
       obstacle.grape.collected = true;
@@ -896,9 +979,8 @@ function updateRaccoonGame(deltaSeconds) {
   }
 
   if (!state.raccoonGame.damageRecovery) {
-    const collidingObstacle = state.raccoonGame.obstacles.find((obstacle) => doesRaccoonHitObstacle(raccoon, obstacle));
     if (collidingObstacle) {
-      applyRaccoonDamage({ type: "obstacle", obstacleId: collidingObstacle.id });
+      applyRaccoonDamage(collidingObstacle);
       return;
     }
 
@@ -908,7 +990,7 @@ function updateRaccoonGame(deltaSeconds) {
   }
 }
 
-function doesRaccoonHitObstacle(raccoon, obstacle) {
+function getRaccoonObstacleCollision(raccoon, obstacle, previousRaccoon, previousObstacleX) {
   const gapTop = obstacle.gapCenter - RACCOON_GAME_CONFIG.gapSize / 2;
   const gapBottom = obstacle.gapCenter + RACCOON_GAME_CONFIG.gapSize / 2;
   const overlapsHorizontally =
@@ -916,10 +998,25 @@ function doesRaccoonHitObstacle(raccoon, obstacle) {
     raccoon.x - raccoon.radius < obstacle.x + RACCOON_GAME_CONFIG.obstacleWidth;
 
   if (!overlapsHorizontally) {
-    return false;
+    return null;
   }
 
-  return raccoon.y - raccoon.radius < gapTop || raccoon.y + raccoon.radius > gapBottom;
+  const hitsTop = raccoon.y - raccoon.radius < gapTop;
+  const hitsBottom = raccoon.y + raccoon.radius > gapBottom;
+  if (!hitsTop && !hitsBottom) {
+    return null;
+  }
+
+  const previouslyOverlappedHorizontally =
+    previousRaccoon.x + raccoon.radius > previousObstacleX &&
+    previousRaccoon.x - raccoon.radius < previousObstacleX + RACCOON_GAME_CONFIG.obstacleWidth;
+
+  return {
+    type: "obstacle",
+    obstacleId: obstacle.id,
+    impact: previouslyOverlappedHorizontally ? (hitsTop ? "top" : "bottom") : "side",
+    hitRegion: hitsTop ? "top" : "bottom",
+  };
 }
 
 function doesRaccoonCollectGrape(raccoon, obstacle) {
@@ -970,7 +1067,19 @@ function applyRaccoonDamage(source) {
   if (source.type === "obstacle") {
     const obstacle = state.raccoonGame.obstacles.find((entry) => entry.id === source.obstacleId);
     if (obstacle) {
-      raccoon.velocityY = raccoon.y < obstacle.gapCenter ? 220 : -220;
+      const gapTop = obstacle.gapCenter - RACCOON_GAME_CONFIG.gapSize / 2;
+      const gapBottom = obstacle.gapCenter + RACCOON_GAME_CONFIG.gapSize / 2;
+
+      if (source.impact === "side") {
+        raccoon.x = Math.max(48, Math.min(RACCOON_HOME_X - 14, obstacle.x - raccoon.radius - 10));
+        raccoon.velocityY = source.hitRegion === "top" ? 215 : -215;
+      } else if (source.impact === "top") {
+        raccoon.y = Math.min(raccoon.y, gapTop - raccoon.radius - 2);
+        raccoon.velocityY = Math.max(210, Math.abs(raccoon.velocityY) * 0.44);
+      } else {
+        raccoon.y = Math.max(raccoon.y, gapBottom + raccoon.radius + 2);
+        raccoon.velocityY = -Math.max(210, Math.abs(raccoon.velocityY) * 0.44);
+      }
     }
   } else {
     if (raccoon.y - raccoon.radius <= 0) {
